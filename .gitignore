@@ -1,0 +1,52 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+# Gradle
+.gradle/
+build/
+**/build/
+!gradle/wrapper/gradle-wrapper.jar
+local.properties
+
+# Android Studio
+.idea/
+*.iml
+*.ipr
+*.iws
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+
+# Kotlin/Java
+out/
+bin/
+
+# Room schema exports (если генерируешь — можно оставить под контроль)
+# schemas/  # <- убери коммент, если не хочешь хранить схемы в репо
+
+# Keystores/секреты
+*.jks
+*.keystore
+*.pem
+
+# Misc
+*.apk
+*.aab

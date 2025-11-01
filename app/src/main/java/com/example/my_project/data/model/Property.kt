@@ -1,0 +1,11 @@
+package com.example.my_project.data.model
+
+import java.util.UUID
+
+data class Property(
+    val id: String = UUID.randomUUID().toString(),
+    val name: String,
+    val address: String? = null,
+    val monthlyRent: Double? = null,
+    val coverUri: String? = null
+)
