@@ -1,35 +1,77 @@
+@file:OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+
 package com.example.my_project.ui.screens
 
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.ArrowDropDown
+import androidx.compose.material.icons.filled.ArrowDropUp
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.Icon
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.my_project.data.model.Property
+import com.example.my_project.data.model.Transaction
 import com.example.my_project.data.model.TxType
 import com.example.my_project.ui.RealEstateViewModel
-import java.time.YearMonth
+import com.example.my_project.ui.util.Totals
+import com.example.my_project.ui.util.computeTotals
+import com.example.my_project.ui.util.moneyFormat
+import com.example.my_project.ui.util.moneyFormatPlain
+import com.example.my_project.ui.util.monthName
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatsScreen(
     vm: RealEstateViewModel,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    preselectedPropertyId: String? = null,
+    onOpenMonth: (year: Int, month: Int, propertyId: String?) -> Unit = { _, _, _ -> }
 ) {
-    val tx = vm.transactions.collectAsState().value
-    val totalIncome = tx.filter { it.type == TxType.INCOME }.sumOf { it.amount }
-    val totalExpense = tx.filter { it.type == TxType.EXPENSE }.sumOf { it.amount }
-    val net = totalIncome - totalExpense
+    val txs by vm.transactions.collectAsState()
+    val properties by vm.properties.collectAsState()
 
-    val ym = YearMonth.now()
-    val thisMonth = tx.filter { it.date.year == ym.year && it.date.month == ym.month }
-    val mIncome = thisMonth.filter { it.type == TxType.INCOME }.sumOf { it.amount }
-    val mExpense = thisMonth.filter { it.type == TxType.EXPENSE }.sumOf { it.amount }
-    val mNet = mIncome - mExpense
+    var selectedPropertyId by rememberSaveable { mutableStateOf<String?>(preselectedPropertyId) }
+    // 0 = Месяц, 1 = Год, 2 = Всё время
+    var tab by rememberSaveable { mutableStateOf(1) }
+
+    val filteredTxs = remember(txs, selectedPropertyId) {
+        if (selectedPropertyId.isNullOrBlank()) txs
+        else txs.filter { it.propertyId == selectedPropertyId }
+    }
 
     Scaffold(
         topBar = {
@@ -38,8 +80,8 @@ fun StatsScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            Icons.Default.ArrowBack,
-                            null
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Назад"
                         )
                     }
                 }
@@ -48,20 +90,299 @@ fun StatsScreen(
     ) { padding ->
         Column(
             Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+                .padding(16.dp)
         ) {
-            Text("Итого за всё время:")
-            Text("Доходы: ${"%,.2f".format(totalIncome)} ₽")
-            Text("Расходы: ${"%,.2f".format(totalExpense)} ₽")
-            Text("Чистая: ${"%,.2f".format(net)} ₽")
-            Divider()
-            Text("За ${ym.month} ${ym.year}:")
-            Text("Доходы: ${"%,.2f".format(mIncome)} ₽")
-            Text("Расходы: ${"%,.2f".format(mExpense)} ₽")
-            Text("Чистая: ${"%,.2f".format(mNet)} ₽")
+            PropertyFilterRow(
+                properties = properties,
+                selectedPropertyId = selectedPropertyId,
+                onSelected = { selectedPropertyId = it }
+            )
+
+            Spacer(Modifier.height(12.dp))
+
+            TabRow(selectedTabIndex = tab) {
+                Tab(selected = tab == 0, onClick = { tab = 0 }, text = { Text("Месяц") })
+                Tab(selected = tab == 1, onClick = { tab = 1 }, text = { Text("Год") })
+                Tab(selected = tab == 2, onClick = { tab = 2 }, text = { Text("Всё время") })
+            }
+
+            Spacer(Modifier.height(16.dp))
+
+            when (tab) {
+                0 -> MonthTab(txs = filteredTxs)
+                1 -> YearTab(
+                    txs = filteredTxs,
+                    onOpenMonth = { y, m -> onOpenMonth(y, m, selectedPropertyId) }
+                )
+                2 -> AllTimeTab(txs = filteredTxs)
+            }
         }
+    }
+}
+
+@Composable
+private fun PropertyFilterRow(
+    properties: List<Property>,
+    selectedPropertyId: String?,
+    onSelected: (String?) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    val selectedLabel = remember(selectedPropertyId, properties) {
+        if (selectedPropertyId == null) "Все объекты"
+        else properties.find { it.id == selectedPropertyId }?.name ?: "Все объекты"
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("Объект:", fontWeight = FontWeight.SemiBold)
+
+        // Якорь для выпадающего меню. Делаем поле однострочным и кликабельным целиком.
+        Box {
+            OutlinedTextField(
+                value = selectedLabel,
+                onValueChange = {},
+                readOnly = true,
+                singleLine = true,          // 👈 гарантируем одну строку
+                maxLines = 1,               // 👈 на всякий случай
+                label = { Text("Фильтр") },
+                trailingIcon = {
+                    val icon = if (expanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = "Раскрыть",
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .clickable { expanded = !expanded }
+                    )
+                },
+                modifier = Modifier
+                    .clickable { expanded = true } // клик по строке тоже открывает меню
+                    // контролируем ширину, чтобы текст не переносился из-за узкого контейнера
+                    .fillMaxWidth(0.6f)
+            )
+
+            DropdownMenu(
+                expanded = expanded,
+                onDismissRequest = { expanded = false }
+            ) {
+                DropdownMenuItem(
+                    text = { Text("Все объекты") },
+                    onClick = {
+                        onSelected(null)
+                        expanded = false
+                    }
+                )
+                properties.forEach { p ->
+                    DropdownMenuItem(
+                        text = { Text(p.name) },
+                        onClick = {
+                            onSelected(p.id)
+                            expanded = false
+                        }
+                    )
+                }
+            }
+        }
+    }
+}
+
+/* ===== Вкладка «Месяц» ===== */
+
+@Composable
+private fun MonthTab(txs: List<Transaction>) {
+    val now = remember { LocalDate.now() }
+    val currentYear = now.year
+    val currentMonth = now.monthValue
+
+    val monthTxs = remember(txs, currentYear, currentMonth) {
+        txs.filter { it.date.year == currentYear && it.date.monthValue == currentMonth }
+            .sortedByDescending { it.date }
+    }
+
+    val totals = remember(monthTxs) { monthTxs.computeTotals() }
+
+    Text("Текущий месяц: ${monthName(currentMonth)} $currentYear", fontWeight = FontWeight.SemiBold)
+    Spacer(Modifier.height(8.dp))
+    TotalsBlock(totals)
+
+    Spacer(Modifier.height(16.dp))
+    Text("Транзакции", style = MaterialTheme.typography.titleMedium)
+    Spacer(Modifier.height(8.dp))
+
+    val dateFmt = remember { DateTimeFormatter.ofPattern("dd.MM.yyyy") }
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(monthTxs) { t ->
+            ElevatedCard(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(12.dp)) {
+                    Text(
+                        if (t.type == TxType.INCOME) "Доход" else "Расход",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    MoneyLine(type = t.type, amount = t.amount)
+                    Text(t.date.format(dateFmt), style = MaterialTheme.typography.bodySmall)
+                    if (!t.note.isNullOrBlank()) {
+                        Text(t.note!!, style = MaterialTheme.typography.bodySmall)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* ===== Вкладка «Год» (кликабельные месяцы) ===== */
+
+@Composable
+private fun YearTab(
+    txs: List<Transaction>,
+    onOpenMonth: (year: Int, month: Int) -> Unit
+) {
+    val years = remember(txs) {
+        txs.map { it.date.year }.distinct().sortedDescending()
+            .ifEmpty { listOf(LocalDate.now().year) }
+    }
+    var selectedYear by rememberSaveable(years) { mutableStateOf(years.first()) }
+
+    data class MonthRow(val month: Int, val totals: Totals)
+
+    val byMonth = remember(txs, selectedYear) {
+        (1..12).map { m ->
+            val monthTx = txs.filter { it.date.year == selectedYear && it.date.monthValue == m }
+            MonthRow(month = m, totals = monthTx.computeTotals())
+        }
+    }
+
+    val yearTotals = remember(byMonth) {
+        Totals(
+            income = byMonth.sumOf { it.totals.income },
+            expense = byMonth.sumOf { it.totals.expense }
+        )
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        Text("Год:", fontWeight = FontWeight.SemiBold)
+
+        var expanded by remember { mutableStateOf(false) }
+        Box {
+            OutlinedTextField(
+                value = selectedYear.toString(),
+                onValueChange = {},
+                readOnly = true,
+                singleLine = true,
+                maxLines = 1,
+                label = { Text("Год") },
+                trailingIcon = {
+                    val icon = if (expanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = "Раскрыть",
+                        modifier = Modifier
+                            .padding(end = 4.dp)
+                            .clickable { expanded = !expanded }
+                    )
+                },
+                modifier = Modifier
+                    .clickable { expanded = true }
+                    .fillMaxWidth(0.4f)
+            )
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                years.forEach { y ->
+                    DropdownMenuItem(
+                        text = { Text(y.toString()) },
+                        onClick = { selectedYear = y; expanded = false }
+                    )
+                }
+            }
+        }
+    }
+
+    Spacer(Modifier.height(12.dp))
+    TotalsBlock(yearTotals)
+
+    Spacer(Modifier.height(16.dp))
+    Text("По месяцам", style = MaterialTheme.typography.titleMedium)
+    Spacer(Modifier.height(8.dp))
+
+    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        items(byMonth) { row ->
+            ElevatedCard(
+                Modifier
+                    .fillMaxWidth()
+                    .clickable { onOpenMonth(selectedYear, row.month) }
+            ) {
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(12.dp)
+                ) {
+                    // Заголовок месяца отдельной строкой
+                    Text(monthName(row.month), fontWeight = FontWeight.SemiBold)
+
+                    // Отступ между заголовком и суммами
+                    Spacer(Modifier.height(8.dp))
+
+                    // Блок сумм прижат вправо
+                    Column(horizontalAlignment = Alignment.End) {
+                        MoneyLineLabel("Доход:", TxType.INCOME, row.totals.income)
+                        MoneyLineLabel("Расход:", TxType.EXPENSE, row.totals.expense)
+                        MoneyLineTotal("Итого:", row.totals.total)
+                    }
+                }
+            }
+        }
+    }
+}
+
+/* ===== Вкладка «Всё время» ===== */
+
+@Composable
+private fun AllTimeTab(txs: List<Transaction>) {
+    val totals = remember(txs) { txs.computeTotals() }
+    Text("За всё время", style = MaterialTheme.typography.titleMedium)
+    Spacer(Modifier.height(8.dp))
+    TotalsBlock(totals)
+}
+
+/* ===== Общие UI-компоненты для денег ===== */
+
+@Composable
+private fun TotalsBlock(t: Totals) {
+    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        MoneyLineLabel("Доход:", TxType.INCOME, t.income)
+        MoneyLineLabel("Расход:", TxType.EXPENSE, t.expense)
+        MoneyLineTotal("Итого:", t.total)
+    }
+}
+
+@Composable
+private fun MoneyLine(type: TxType, amount: Double) {
+    val text = moneyFormat(amount, type)
+    val color = if (type == TxType.INCOME) Color(0xFF2E7D32) else Color(0xFFC62828)
+    Text(text, color = color, fontWeight = FontWeight.Medium)
+}
+
+@Composable
+private fun MoneyLineLabel(label: String, type: TxType, amount: Double) {
+    val text = moneyFormat(amount, type)
+    val color = if (type == TxType.INCOME) Color(0xFF2E7D32) else Color(0xFFC62828)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label)
+        Text(text, color = color, fontWeight = FontWeight.Medium)
+    }
+}
+
+@Composable
+private fun MoneyLineTotal(label: String, amount: Double) {
+    val text = moneyFormatPlain(amount)
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, fontWeight = FontWeight.SemiBold)
+        Text(text, fontWeight = FontWeight.SemiBold)
     }
 }
