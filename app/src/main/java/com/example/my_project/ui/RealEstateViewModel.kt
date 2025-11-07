@@ -50,10 +50,6 @@ class RealEstateViewModel @Inject constructor(
         return repo.getProperty(uid, id)
     }
 
-    /** Удобная синхронная обёртка, чтобы быстро получить объект из кеша стейта */
-    fun getPropertySync(id: String): Property? =
-        properties.value.firstOrNull { it.id == id }
-
     fun updateProperty(id: String, name: String, address: String?, monthlyRent: Double?) {
         val uid = userIdFlow.value ?: return
         viewModelScope.launch { repo.updateProperty(uid, id, name, address, monthlyRent) }
@@ -75,7 +71,17 @@ class RealEstateViewModel @Inject constructor(
         return repo.transactionsFor(uid, propertyId)
     }
 
-    /** Сигнатура приведена в соответствие с экраном: с параметром date */
+    /**
+     * СТАРАЯ версия — без даты (используем LocalDate.now()).
+     * Нужна, чтобы не ломать существующие вызовы без date.
+     */
+    fun addTransaction(propertyId: String, isIncome: Boolean, amount: Double, note: String?) {
+        addTransaction(propertyId, isIncome, amount, LocalDate.now(), note)
+    }
+
+    /**
+     * НОВАЯ перегрузка — с явной датой (поддерживает вызовы вида date = ...).
+     */
     fun addTransaction(
         propertyId: String,
         isIncome: Boolean,
