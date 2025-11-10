@@ -70,7 +70,7 @@ fun RealEstateNavigation() {
     // Текущий пользователь
     val userIdState by authVm.userId.collectAsState()
 
-    // Сообщаем userId в data-VM (если в VM нет метода — наша заглушка ниже ничего не сделает)
+    // Сообщаем userId в data-VM (если в VM нет метода — заглушка ниже ничего не делает)
     LaunchedEffect(userIdState) {
         mainVm.setCurrentUser(userIdState)
     }
@@ -157,9 +157,11 @@ fun RealEstateNavigation() {
                 propertyId = id,
                 onBack = { nav.popBackStack() },
                 onEditProperty = { nav.navigate(Destinations.EditProperty.route(id)) },
-                onOpenStatsForProperty = {
-                    nav.navigate(Destinations.Stats.route(propertyId = id))
-                }
+                onOpenStatsForProperty = { nav.navigate(Destinations.Stats.route(propertyId = id)) },
+                onOpenBills = { nav.navigate(BillsDest.list(id)) },
+                // временно без реальных данных — плейсхолдеры внутри экрана справятся
+                propertyName = null,
+                propertyAddress = null
             )
         }
 
@@ -223,10 +225,13 @@ fun RealEstateNavigation() {
                 onBack = { nav.popBackStack() }
             )
         }
+
+        /* ---- Вложенный граф "Счета" ---- */
+        registerBillsGraph(navController = nav, vm = mainVm)
     }
 }
 
 /* ---------- Безопасная заглушка: если в VM нет метода setCurrentUser ---------- */
 private fun RealEstateViewModel.setCurrentUser(userId: String?) {
-    // no-op; когда реализуешь метод в VM — вызов начнёт использовать реализацию из класса
+    // no-op
 }
