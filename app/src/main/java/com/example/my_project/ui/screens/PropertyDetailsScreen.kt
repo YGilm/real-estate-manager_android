@@ -29,11 +29,17 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.my_project.ui.RealEstateViewModel
 
 @Composable
@@ -44,9 +50,6 @@ fun PropertyDetailsScreen(
     onEditProperty: () -> Unit,
     onOpenStatsForProperty: () -> Unit,
     onOpenBills: () -> Unit,
-    // ↓ Новые необязательные параметры — чтобы убрать любые обращения к state
-    propertyName: String? = null,
-    propertyAddress: String? = null
 ) {
     Scaffold(
         topBar = {
@@ -61,12 +64,7 @@ fun PropertyDetailsScreen(
                     }
                 },
                 actions = {
-                    IconButton(onClick = onOpenBills) {
-                        Icon(
-                            imageVector = Icons.Filled.ReceiptLong,
-                            contentDescription = "Счета"
-                        )
-                    }
+                    // Только редактирование — без дублирующей иконки "Счета"
                     IconButton(onClick = onEditProperty) {
                         Icon(
                             imageVector = Icons.Filled.Edit,
@@ -86,9 +84,7 @@ fun PropertyDetailsScreen(
             propertyId = propertyId,
             onOpenStatsForProperty = onOpenStatsForProperty,
             onOpenBills = onOpenBills,
-            onEditProperty = onEditProperty,
-            propertyName = propertyName,
-            propertyAddress = propertyAddress
+            onEditProperty = onEditProperty
         )
     }
 }
@@ -100,10 +96,16 @@ private fun PropertyDetailsContent(
     propertyId: String,
     onOpenStatsForProperty: () -> Unit,
     onOpenBills: () -> Unit,
-    onEditProperty: () -> Unit,
-    propertyName: String?,
-    propertyAddress: String?
+    onEditProperty: () -> Unit
 ) {
+    // Берём объект из VM по id
+    val properties by vm.properties.collectAsState()
+    val property = properties.firstOrNull { it.id == propertyId }
+
+    val titleText = property?.name?.takeIf { it.isNotBlank() } ?: "Объект недвижимости"
+    val addressText = property?.address?.takeIf { it.isNotBlank() }
+    val coverUri = property?.coverUri
+
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -114,12 +116,11 @@ private fun PropertyDetailsContent(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             PropertyAvatar(
-                name = propertyName,
-                imageUrl = null // когда появится URL — заменим на AsyncImage(CoIL)
+                imageUrl = coverUri
             )
+
             Spacer(Modifier.height(12.dp))
 
-            val titleText = propertyName?.takeIf { it.isNotBlank() } ?: "Объект недвижимости"
             Text(
                 text = titleText,
                 style = MaterialTheme.typography.titleLarge,
@@ -127,7 +128,6 @@ private fun PropertyDetailsContent(
                 overflow = TextOverflow.Ellipsis
             )
 
-            val addressText = propertyAddress?.takeIf { it.isNotBlank() }
             if (addressText != null) {
                 Text(
                     text = addressText,
@@ -139,7 +139,7 @@ private fun PropertyDetailsContent(
             }
         }
 
-        // ===== Кнопки: 2 ряда по 2, симметрия и иконки =====
+        // ===== Кнопки: 2 ряда по 2 =====
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -155,7 +155,9 @@ private fun PropertyDetailsContent(
             }
 
             ElevatedButton(
-                onClick = { /* TODO: навигация к транзакциям по объекту */ },
+                onClick = {
+                    // TODO: навигация к транзакциям по объекту
+                },
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
             ) {
@@ -184,7 +186,8 @@ private fun PropertyDetailsContent(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
             ) {
-                Icon(Icons.Filled.ReceiptLong, contentDescription = null) // при желании замени на иконку статистики
+                // При желании можно заменить на иконку статистики
+                Icon(Icons.Filled.ReceiptLong, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
                 Text("Статистика")
             }
@@ -197,21 +200,39 @@ private fun PropertyDetailsContent(
 @Composable
 private fun PropertyAvatar(
     modifier: Modifier = Modifier,
-    name: String? = null,
     imageUrl: String? = null
 ) {
-    // Пока дефолтная иконка; заменим на Coil AsyncImage, если появится imageUrl
-    Box(
-        modifier = modifier
-            .size(96.dp)
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceVariant),
-        contentAlignment = Alignment.Center
-    ) {
-        Icon(
-            imageVector = Icons.Outlined.Apartment,
+    val context = LocalContext.current
+
+    if (!imageUrl.isNullOrBlank()) {
+        // Показываем сохранённую картинку объекта
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(imageUrl)
+                .crossfade(true)
+                .build(),
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            modifier = modifier
+                .size(96.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            // Чтобы не было полос по бокам — заполняем круг полностью
+            contentScale = ContentScale.FillBounds
         )
+    } else {
+        // Дефолтная иконка, если аватар ещё не загружен
+        Box(
+            modifier = modifier
+                .size(96.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Apartment,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }

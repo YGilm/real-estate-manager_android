@@ -9,12 +9,12 @@ plugins {
 
 android {
     namespace = "com.example.my_project"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.my_project"
         minSdk = 24
-        targetSdk = 34
+        targetSdk = 35
         versionCode = 1
         versionName = "1.0"
         vectorDrawables { useSupportLibrary = true }
@@ -69,6 +69,7 @@ kapt {
 }
 
 dependencies {
+    implementation(libs.androidx.compose.foundation)
     // Compose BOM
     val composeBom = platform("androidx.compose:compose-bom:2024.10.01")
     implementation(composeBom)
