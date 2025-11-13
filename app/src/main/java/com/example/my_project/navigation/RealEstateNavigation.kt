@@ -76,7 +76,8 @@ fun RealEstateNavigation() {
     }
 
     // Стартовый экран
-    val start = if (userIdState == null) Destinations.AuthSignIn.route else Destinations.Home.route
+    val start =
+        if (userIdState == null) Destinations.AuthSignIn.route else Destinations.Home.route
 
     // Реактивная перенавигация при логине/логауте
     LaunchedEffect(userIdState) {
@@ -84,7 +85,8 @@ fun RealEstateNavigation() {
         if (userIdState == null && current != Destinations.AuthSignIn.route) {
             nav.navigate(Destinations.AuthSignIn.route) { popUpTo(0) }
         }
-        if (userIdState != null &&
+        if (
+            userIdState != null &&
             (current == Destinations.AuthSignIn.route || current == Destinations.AuthSignUp.route)
         ) {
             nav.navigate(Destinations.Home.route) { popUpTo(0) }
@@ -99,7 +101,9 @@ fun RealEstateNavigation() {
             SignInScreen(
                 onSignIn = { email, pass, remember ->
                     authVm.login(email, pass, remember) { err ->
-                        if (err == null) nav.navigate(Destinations.Home.route) { popUpTo(0) }
+                        if (err == null) {
+                            nav.navigate(Destinations.Home.route) { popUpTo(0) }
+                        }
                     }
                 },
                 onGoSignUp = { nav.navigate(Destinations.AuthSignUp.route) }
@@ -110,7 +114,9 @@ fun RealEstateNavigation() {
             SignUpScreen(
                 onSignUp = { email, pass, remember ->
                     authVm.register(email, pass, remember) { err ->
-                        if (err == null) nav.navigate(Destinations.Home.route) { popUpTo(0) }
+                        if (err == null) {
+                            nav.navigate(Destinations.Home.route) { popUpTo(0) }
+                        }
                     }
                 },
                 onBack = { nav.popBackStack() }
@@ -152,16 +158,19 @@ fun RealEstateNavigation() {
             arguments = listOf(navArgument("id") { type = NavType.StringType })
         ) { backStackEntry ->
             val id = backStackEntry.arguments?.getString("id") ?: return@composable
+
             PropertyDetailsScreen(
                 vm = mainVm,
                 propertyId = id,
                 onBack = { nav.popBackStack() },
                 onEditProperty = { nav.navigate(Destinations.EditProperty.route(id)) },
-                onOpenStatsForProperty = { nav.navigate(Destinations.Stats.route(propertyId = id)) },
-                onOpenBills = { nav.navigate(BillsDest.list(id)) },
-                // временно без реальных данных — плейсхолдеры внутри экрана справятся
-                propertyName = null,
-                propertyAddress = null
+                onOpenStatsForProperty = {
+                    nav.navigate(Destinations.Stats.route(propertyId = id))
+                },
+                onOpenBills = {
+                    // 👇 Отсюда идём в список счетов по объекту
+                    nav.navigate(BillsDest.list(id))
+                }
             )
         }
 
@@ -227,11 +236,14 @@ fun RealEstateNavigation() {
         }
 
         /* ---- Вложенный граф "Счета" ---- */
-        registerBillsGraph(navController = nav, vm = mainVm)
+        registerBillsGraph(
+            navController = nav,
+            vm = mainVm
+        )
     }
 }
 
 /* ---------- Безопасная заглушка: если в VM нет метода setCurrentUser ---------- */
 private fun RealEstateViewModel.setCurrentUser(userId: String?) {
-    // no-op
+    // no-op, чтобы не падать, пока не реализуешь в VM
 }

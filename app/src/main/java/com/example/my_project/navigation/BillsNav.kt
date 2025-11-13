@@ -1,7 +1,7 @@
 package com.example.my_project.navigation
 
-import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
+import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
@@ -10,25 +10,33 @@ import com.example.my_project.ui.bills.BillEditScreen
 import com.example.my_project.ui.bills.BillsListScreen
 
 /**
- * Маршруты для блока "Счета" внутри объекта недвижимости.
+ * Маршруты для раздела "Счета".
  */
 object BillsDest {
-    const val LIST = "bills/{propertyId}"
-    fun list(propertyId: String) = "bills/$propertyId"
 
-    const val EDIT = "bills/{propertyId}/edit?billId={billId}"
-    fun edit(propertyId: String, billId: String? = null): String =
-        if (billId == null) "bills/$propertyId/edit"
-        else "bills/$propertyId/edit?billId=$billId"
+    // Паттерны для NavHost
+    const val LIST_PATTERN = "bills/{propertyId}"
+    const val EDIT_PATTERN = "bills/{propertyId}/edit?billId={billId}"
+
+    // Готовые строки для навигации
+    fun list(propertyId: String): String = "bills/$propertyId"
+
+    fun new(propertyId: String): String = "bills/$propertyId/edit"
+
+    fun edit(propertyId: String, billId: String): String =
+        "bills/$propertyId/edit?billId=$billId"
 }
 
+/**
+ * Вложенный навграф для работы со счетами.
+ */
 fun NavGraphBuilder.registerBillsGraph(
-    navController: NavController,
-    vm: RealEstateViewModel
+    navController: NavHostController,
+    vm: RealEstateViewModel // сейчас не используем, но оставляем на будущее
 ) {
-    // Список счетов для объекта
+    // ----- Список счетов -----
     composable(
-        route = BillsDest.LIST,
+        route = BillsDest.LIST_PATTERN,
         arguments = listOf(
             navArgument("propertyId") { type = NavType.StringType }
         )
@@ -36,17 +44,22 @@ fun NavGraphBuilder.registerBillsGraph(
         val propertyId = backStackEntry.arguments?.getString("propertyId") ?: return@composable
 
         BillsListScreen(
-            vm = vm,
             propertyId = propertyId,
             onBack = { navController.popBackStack() },
-            onCreate = { navController.navigate(BillsDest.edit(propertyId)) },
-            onEdit = { billId -> navController.navigate(BillsDest.edit(propertyId, billId)) }
+            onOpenBill = { billId ->
+                val route = if (billId == null) {
+                    BillsDest.new(propertyId)
+                } else {
+                    BillsDest.edit(propertyId, billId)
+                }
+                navController.navigate(route)
+            }
         )
     }
 
-    // Создание/редактирование счёта
+    // ----- Создание / редактирование одного счёта -----
     composable(
-        route = BillsDest.EDIT,
+        route = BillsDest.EDIT_PATTERN,
         arguments = listOf(
             navArgument("propertyId") { type = NavType.StringType },
             navArgument("billId") {
@@ -60,7 +73,6 @@ fun NavGraphBuilder.registerBillsGraph(
         val billId = backStackEntry.arguments?.getString("billId")
 
         BillEditScreen(
-            vm = vm,
             propertyId = propertyId,
             billId = billId,
             onBack = { navController.popBackStack() }

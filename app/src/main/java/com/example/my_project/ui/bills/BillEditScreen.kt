@@ -2,107 +2,94 @@ package com.example.my_project.ui.bills
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.Button
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.my_project.ui.RealEstateViewModel
 
+/**
+ * Экран создания/редактирования счёта.
+ *
+ * Пока без связи с БД/репозиторием — чистая UI-заглушка,
+ * чтобы навигация и параметры компилировались.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BillEditScreen(
-    vm: RealEstateViewModel,
     propertyId: String,
-    billId: String?,                 // null = создаём новый
+    billId: String?,          // null => новый счёт
     onBack: () -> Unit
 ) {
-    var title by remember { mutableStateOf("") }
-    var amount by remember { mutableStateOf("") }
-    var dueDate by remember { mutableStateOf("") } // YYYY-MM-DD (заглушка)
+    val isNew = billId == null
+
+    // Простые локальные стейты (заглушка)
+    val titleState = remember { mutableStateOf("") }
+    val amountState = remember { mutableStateOf("") }
+    val noteState = remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text(if (billId == null) "Новый счёт" else "Редактирование счёта") },
+                title = { Text(if (isNew) "Новый счёт" else "Редактирование счёта") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
-                            imageVector = androidx.compose.material.icons.Icons.AutoMirrored.Filled.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "Назад"
                         )
                     }
-                },
-                actions = {
-                    TextButton(onClick = {
-                        // TODO: вызвать vm.saveBill(...)
-                        // Сейчас — заглушка: просто закрываем экран
-                        onBack()
-                    }) { Text("СОХРАНИТЬ") }
                 }
             )
         }
-    ) { padding ->
+    ) { inner ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.Top
+                .padding(inner)
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            Text(text = "Объект: $propertyId")
+
             OutlinedTextField(
-                value = title,
-                onValueChange = { title = it },
-                label = { Text("Название") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = amount,
-                onValueChange = { amount = it },
-                label = { Text("Сумма (₽)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-            Spacer(Modifier.height(12.dp))
-            OutlinedTextField(
-                value = dueDate,
-                onValueChange = { dueDate = it },
-                label = { Text("Срок оплаты (YYYY-MM-DD)") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
+                value = titleState.value,
+                onValueChange = { titleState.value = it },
+                label = { Text("Название счёта") },
+                modifier = Modifier.fillMaxSize(fraction = 1f)
             )
 
-            Spacer(Modifier.height(24.dp))
+            OutlinedTextField(
+                value = amountState.value,
+                onValueChange = { amountState.value = it },
+                label = { Text("Сумма") }
+            )
+
+            OutlinedTextField(
+                value = noteState.value,
+                onValueChange = { noteState.value = it },
+                label = { Text("Комментарий") }
+            )
+
             Button(
                 onClick = {
-                    // TODO: то же что и в action "СОХРАНИТЬ"
+                    // TODO: здесь позже вызовем сохранение в ViewModel/репозиторий
                     onBack()
-                },
-                modifier = Modifier.fillMaxWidth()
+                }
             ) {
-                Text("Сохранить")
+                Text(if (isNew) "Создать" else "Сохранить")
             }
         }
     }
