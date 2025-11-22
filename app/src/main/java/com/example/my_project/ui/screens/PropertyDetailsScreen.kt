@@ -21,6 +21,8 @@ import androidx.compose.material.icons.automirrored.outlined.Assignment
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.ReceiptLong
 import androidx.compose.material.icons.outlined.Apartment
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -34,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -50,6 +53,7 @@ fun PropertyDetailsScreen(
     onEditProperty: () -> Unit,
     onOpenStatsForProperty: () -> Unit,
     onOpenBills: () -> Unit,
+    onOpenTransactions: () -> Unit,
 ) {
     Scaffold(
         topBar = {
@@ -64,7 +68,6 @@ fun PropertyDetailsScreen(
                     }
                 },
                 actions = {
-                    // Только редактирование — без дублирующей иконки "Счета"
                     IconButton(onClick = onEditProperty) {
                         Icon(
                             imageVector = Icons.Filled.Edit,
@@ -84,7 +87,8 @@ fun PropertyDetailsScreen(
             propertyId = propertyId,
             onOpenStatsForProperty = onOpenStatsForProperty,
             onOpenBills = onOpenBills,
-            onEditProperty = onEditProperty
+            onEditProperty = onEditProperty,
+            onOpenTransactions = onOpenTransactions,
         )
     }
 }
@@ -96,9 +100,9 @@ private fun PropertyDetailsContent(
     propertyId: String,
     onOpenStatsForProperty: () -> Unit,
     onOpenBills: () -> Unit,
-    onEditProperty: () -> Unit
+    onEditProperty: () -> Unit,
+    onOpenTransactions: () -> Unit,
 ) {
-    // Берём объект из VM по id
     val properties by vm.properties.collectAsState()
     val property = properties.firstOrNull { it.id == propertyId }
 
@@ -110,7 +114,6 @@ private fun PropertyDetailsContent(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
-        // ===== Шапка с аватаром и названием =====
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally
@@ -139,7 +142,6 @@ private fun PropertyDetailsContent(
             }
         }
 
-        // ===== Кнопки: 2 ряда по 2 =====
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -155,9 +157,7 @@ private fun PropertyDetailsContent(
             }
 
             ElevatedButton(
-                onClick = {
-                    // TODO: навигация к транзакциям по объекту
-                },
+                onClick = onOpenTransactions,
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
             ) {
@@ -186,14 +186,13 @@ private fun PropertyDetailsContent(
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
             ) {
-                // При желании можно заменить на иконку статистики
                 Icon(Icons.Filled.ReceiptLong, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
                 Text("Статистика")
             }
         }
 
-        // Здесь можно добавить остальной контент деталей объекта
+        // дальше — остальной контент деталей объекта, если он у тебя есть
     }
 }
 
@@ -205,7 +204,6 @@ private fun PropertyAvatar(
     val context = LocalContext.current
 
     if (!imageUrl.isNullOrBlank()) {
-        // Показываем сохранённую картинку объекта
         AsyncImage(
             model = ImageRequest.Builder(context)
                 .data(imageUrl)
@@ -216,11 +214,9 @@ private fun PropertyAvatar(
                 .size(96.dp)
                 .clip(CircleShape)
                 .background(MaterialTheme.colorScheme.surfaceVariant),
-            // Чтобы не было полос по бокам — заполняем круг полностью
             contentScale = ContentScale.FillBounds
         )
     } else {
-        // Дефолтная иконка, если аватар ещё не загружен
         Box(
             modifier = modifier
                 .size(96.dp)

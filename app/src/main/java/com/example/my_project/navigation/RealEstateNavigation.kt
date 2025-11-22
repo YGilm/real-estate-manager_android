@@ -3,7 +3,6 @@
 package com.example.my_project.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -19,6 +18,7 @@ import com.example.my_project.ui.screens.EditPropertyScreen
 import com.example.my_project.ui.screens.HomeScreen
 import com.example.my_project.ui.screens.PropertiesListScreen
 import com.example.my_project.ui.screens.PropertyDetailsScreen
+import com.example.my_project.ui.screens.PropertyTransactionsScreen
 import com.example.my_project.ui.screens.SignInScreen
 import com.example.my_project.ui.screens.SignUpScreen
 import com.example.my_project.ui.screens.StatsMonthScreen
@@ -41,6 +41,10 @@ sealed class Destinations(val route: String) {
 
     data object EditProperty : Destinations("edit_property/{id}") {
         fun route(id: String) = "edit_property/$id"
+    }
+
+    data object PropertyTransactions : Destinations("property_transactions/{id}") {
+        fun route(id: String) = "property_transactions/$id"
     }
 
     /** Общая статистика (опциональный параметр propertyId) */
@@ -70,32 +74,14 @@ fun RealEstateNavigation() {
     // Текущий пользователь
     val userIdState by authVm.userId.collectAsState()
 
-    // Сообщаем userId в data-VM (если в VM нет метода — заглушка ниже ничего не делает)
-    LaunchedEffect(userIdState) {
-        mainVm.setCurrentUser(userIdState)
-    }
-
     // Стартовый экран
-    val start =
+    val startDestination =
         if (userIdState == null) Destinations.AuthSignIn.route else Destinations.Home.route
 
-    // Реактивная перенавигация при логине/логауте
-    LaunchedEffect(userIdState) {
-        val current = nav.currentDestination?.route
-        if (userIdState == null && current != Destinations.AuthSignIn.route) {
-            nav.navigate(Destinations.AuthSignIn.route) { popUpTo(0) }
-        }
-        if (
-            userIdState != null &&
-            (current == Destinations.AuthSignIn.route || current == Destinations.AuthSignUp.route)
-        ) {
-            nav.navigate(Destinations.Home.route) { popUpTo(0) }
-        }
-    }
-
-    /* ---------- Навигационная карта ---------- */
-    NavHost(navController = nav, startDestination = start) {
-
+    NavHost(
+        navController = nav,
+        startDestination = startDestination
+    ) {
         /* ---- Авторизация ---- */
         composable(Destinations.AuthSignIn.route) {
             SignInScreen(
@@ -123,11 +109,11 @@ fun RealEstateNavigation() {
             )
         }
 
-        /* ---- Главная ---- */
+        /* ---- Главный экран ---- */
         composable(Destinations.Home.route) {
             HomeScreen(
-                onOpenStats = { nav.navigate(Destinations.Stats.route()) },
-                onOpenProperties = { nav.navigate(Destinations.Properties.route) }
+                onOpenProperties = { nav.navigate(Destinations.Properties.route) },
+                onOpenStats = { nav.navigate(Destinations.Stats.route()) }
             )
         }
 
@@ -170,6 +156,9 @@ fun RealEstateNavigation() {
                 onOpenBills = {
                     // 👇 Отсюда идём в список счетов по объекту
                     nav.navigate(BillsDest.list(id))
+                },
+                onOpenTransactions = {
+                    nav.navigate(Destinations.PropertyTransactions.route(id))
                 }
             )
         }
@@ -187,6 +176,19 @@ fun RealEstateNavigation() {
             )
         }
 
+        /* ---- Транзакции по объекту ---- */
+        composable(
+            route = Destinations.PropertyTransactions.route,
+            arguments = listOf(navArgument("id") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("id") ?: return@composable
+            PropertyTransactionsScreen(
+                vm = mainVm,
+                propertyId = id,
+                onBack = { nav.popBackStack() }
+            )
+        }
+
         /* ---- Общая статистика ---- */
         composable(
             route = Destinations.Stats.route,
@@ -198,13 +200,12 @@ fun RealEstateNavigation() {
                 }
             )
         ) { backStackEntry ->
-            val preselected = backStackEntry.arguments?.getString("propertyId")
+            // пока StatsScreen не принимает propertyId, просто игнорируем аргумент
             StatsScreen(
                 vm = mainVm,
                 onBack = { nav.popBackStack() },
-                preselectedPropertyId = preselected,
-                onOpenMonth = { year, month, propertyId ->
-                    nav.navigate(Destinations.StatsMonth.route(year, month, propertyId))
+                onOpenMonth = { year, month, pid ->
+                    nav.navigate(Destinations.StatsMonth.route(year, month, pid))
                 }
             )
         }
@@ -224,26 +225,16 @@ fun RealEstateNavigation() {
         ) { backStackEntry ->
             val year = backStackEntry.arguments?.getInt("year") ?: return@composable
             val month = backStackEntry.arguments?.getInt("month") ?: return@composable
-            val propertyId = backStackEntry.arguments?.getString("propertyId")
+            val propertyIdArg =
+                backStackEntry.arguments?.getString("propertyId")?.takeIf { it.isNotBlank() }
 
             StatsMonthScreen(
                 vm = mainVm,
                 year = year,
                 month = month,
-                propertyId = propertyId,
+                propertyId = propertyIdArg,
                 onBack = { nav.popBackStack() }
             )
         }
-
-        /* ---- Вложенный граф "Счета" ---- */
-        registerBillsGraph(
-            navController = nav,
-            vm = mainVm
-        )
     }
-}
-
-/* ---------- Безопасная заглушка: если в VM нет метода setCurrentUser ---------- */
-private fun RealEstateViewModel.setCurrentUser(userId: String?) {
-    // no-op, чтобы не падать, пока не реализуешь в VM
 }
