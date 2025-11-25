@@ -3,6 +3,7 @@
 package com.example.my_project.navigation
 
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -47,13 +48,11 @@ sealed class Destinations(val route: String) {
         fun route(id: String) = "property_transactions/$id"
     }
 
-    /** Общая статистика (опциональный параметр propertyId) */
     data object Stats : Destinations("stats?propertyId={propertyId}") {
         fun route(propertyId: String? = null): String =
             if (propertyId.isNullOrBlank()) "stats" else "stats?propertyId=$propertyId"
     }
 
-    /** Детализация по месяцу (опционально propertyId как query) */
     data object StatsMonth : Destinations("stats_month/{year}/{month}?propertyId={propertyId}") {
         fun route(year: Int, month: Int, propertyId: String? = null): String {
             val base = "stats_month/$year/$month"
@@ -67,22 +66,36 @@ sealed class Destinations(val route: String) {
 fun RealEstateNavigation() {
     val nav = rememberNavController()
 
-    // ViewModel'ы
     val authVm: AuthViewModel = hiltViewModel()
     val mainVm: RealEstateViewModel = hiltViewModel()
 
-    // Текущий пользователь
     val userIdState by authVm.userId.collectAsState()
 
-    // Стартовый экран
-    val startDestination =
+    LaunchedEffect(userIdState) {
+        mainVm.setCurrentUser(userIdState)
+    }
+
+    val start =
         if (userIdState == null) Destinations.AuthSignIn.route else Destinations.Home.route
+
+    LaunchedEffect(userIdState) {
+        val current = nav.currentDestination?.route
+        if (userIdState == null && current != Destinations.AuthSignIn.route) {
+            nav.navigate(Destinations.AuthSignIn.route) { popUpTo(0) }
+        }
+        if (
+            userIdState != null &&
+            (current == Destinations.AuthSignIn.route || current == Destinations.AuthSignUp.route)
+        ) {
+            nav.navigate(Destinations.Home.route) { popUpTo(0) }
+        }
+    }
 
     NavHost(
         navController = nav,
-        startDestination = startDestination
+        startDestination = start
     ) {
-        /* ---- Авторизация ---- */
+        /* ---- Аутентификация ---- */
         composable(Destinations.AuthSignIn.route) {
             SignInScreen(
                 onSignIn = { email, pass, remember ->
@@ -109,11 +122,11 @@ fun RealEstateNavigation() {
             )
         }
 
-        /* ---- Главный экран ---- */
+        /* ---- Главная ---- */
         composable(Destinations.Home.route) {
             HomeScreen(
-                onOpenProperties = { nav.navigate(Destinations.Properties.route) },
-                onOpenStats = { nav.navigate(Destinations.Stats.route()) }
+                onOpenStats = { nav.navigate(Destinations.Stats.route()) },
+                onOpenProperties = { nav.navigate(Destinations.Properties.route) }
             )
         }
 
@@ -130,8 +143,15 @@ fun RealEstateNavigation() {
         /* ---- Добавление объекта ---- */
         composable(Destinations.AddProperty.route) {
             AddPropertyScreen(
-                onSave = { name, address, rent ->
-                    mainVm.addProperty(name, address, rent)
+                onSave = { name, address, rent, leaseFrom, leaseTo, coverUri ->
+                    mainVm.addProperty(
+                        name = name,
+                        address = address,
+                        monthlyRent = rent,
+                        leaseFrom = leaseFrom,
+                        leaseTo = leaseTo,
+                        coverUri = coverUri
+                    )
                     nav.popBackStack()
                 },
                 onCancel = { nav.popBackStack() }
@@ -154,12 +174,25 @@ fun RealEstateNavigation() {
                     nav.navigate(Destinations.Stats.route(propertyId = id))
                 },
                 onOpenBills = {
-                    // 👇 Отсюда идём в список счетов по объекту
                     nav.navigate(BillsDest.list(id))
                 },
                 onOpenTransactions = {
                     nav.navigate(Destinations.PropertyTransactions.route(id))
                 }
+            )
+        }
+
+        /* ---- Транзакции по объекту ---- */
+        composable(
+            route = Destinations.PropertyTransactions.route,
+            arguments = listOf(navArgument("id") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val id = backStackEntry.arguments?.getString("id") ?: return@composable
+
+            PropertyTransactionsScreen(
+                vm = mainVm,
+                propertyId = id,
+                onBack = { nav.popBackStack() }
             )
         }
 
@@ -170,19 +203,6 @@ fun RealEstateNavigation() {
         ) { backStackEntry ->
             val id = backStackEntry.arguments?.getString("id") ?: return@composable
             EditPropertyScreen(
-                vm = mainVm,
-                propertyId = id,
-                onBack = { nav.popBackStack() }
-            )
-        }
-
-        /* ---- Транзакции по объекту ---- */
-        composable(
-            route = Destinations.PropertyTransactions.route,
-            arguments = listOf(navArgument("id") { type = NavType.StringType })
-        ) { backStackEntry ->
-            val id = backStackEntry.arguments?.getString("id") ?: return@composable
-            PropertyTransactionsScreen(
                 vm = mainVm,
                 propertyId = id,
                 onBack = { nav.popBackStack() }
@@ -200,12 +220,13 @@ fun RealEstateNavigation() {
                 }
             )
         ) { backStackEntry ->
-            // пока StatsScreen не принимает propertyId, просто игнорируем аргумент
+            val preselected = backStackEntry.arguments?.getString("propertyId")
             StatsScreen(
                 vm = mainVm,
                 onBack = { nav.popBackStack() },
-                onOpenMonth = { year, month, pid ->
-                    nav.navigate(Destinations.StatsMonth.route(year, month, pid))
+                preselectedPropertyId = preselected,
+                onOpenMonth = { year, month, propertyId ->
+                    nav.navigate(Destinations.StatsMonth.route(year, month, propertyId))
                 }
             )
         }
@@ -225,16 +246,26 @@ fun RealEstateNavigation() {
         ) { backStackEntry ->
             val year = backStackEntry.arguments?.getInt("year") ?: return@composable
             val month = backStackEntry.arguments?.getInt("month") ?: return@composable
-            val propertyIdArg =
-                backStackEntry.arguments?.getString("propertyId")?.takeIf { it.isNotBlank() }
+            val propertyId = backStackEntry.arguments?.getString("propertyId")
 
             StatsMonthScreen(
                 vm = mainVm,
                 year = year,
                 month = month,
-                propertyId = propertyIdArg,
+                propertyId = propertyId,
                 onBack = { nav.popBackStack() }
             )
         }
+
+        /* ---- Вложенный граф "Счета" ---- */
+        registerBillsGraph(
+            navController = nav,
+            vm = mainVm
+        )
     }
+}
+
+/* ---------- Безопасная заглушка: если в VM нет метода setCurrentUser ---------- */
+private fun RealEstateViewModel.setCurrentUser(userId: String?) {
+    // no-op
 }

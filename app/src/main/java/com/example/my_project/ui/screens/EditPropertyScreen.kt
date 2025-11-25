@@ -2,50 +2,26 @@
 
 package com.example.my_project.ui.screens
 
-import android.content.Intent
+import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.Button
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.outlined.Apartment
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.my_project.ui.RealEstateViewModel
-import androidx.compose.foundation.text.KeyboardOptions
 
 @Composable
 fun EditPropertyScreen(
@@ -53,54 +29,43 @@ fun EditPropertyScreen(
     propertyId: String,
     onBack: () -> Unit
 ) {
-    val properties by vm.properties.collectAsState()
-    val current = properties.firstOrNull { it.id == propertyId }
+    var isLoading by remember { mutableStateOf(true) }
 
-    // Локальные стейты для формы, инициализируем из current
-    var name by remember(current?.id) { mutableStateOf(current?.name.orEmpty()) }
-    var address by remember(current?.id) { mutableStateOf(current?.address.orEmpty()) }
-    var rentText by remember(current?.id) {
-        mutableStateOf(current?.monthlyRent?.toString().orEmpty())
+    var name by remember { mutableStateOf("") }
+    var address by remember { mutableStateOf("") }
+    var rentText by remember { mutableStateOf("") }
+    var leaseFromText by remember { mutableStateOf("") }
+    var leaseToText by remember { mutableStateOf("") }
+    var coverUri by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(propertyId) {
+        val p = vm.getProperty(propertyId)
+        if (p != null) {
+            name = p.name
+            address = p.address.orEmpty()
+            rentText = p.monthlyRent?.toString().orEmpty()
+            leaseFromText = p.leaseFrom.orEmpty()
+            leaseToText = p.leaseTo.orEmpty()
+            coverUri = p.coverUri
+        }
+        isLoading = false
     }
-
-    // coverUri из БД — отдельное состояние, чтобы синхронно видеть и редактировать
-    var coverUri by remember(current?.id) { mutableStateOf(current?.coverUri) }
 
     val context = LocalContext.current
-
-    // Пикер изображения для аватара
-    val imagePicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument()
-    ) { uri ->
+    val pickImageLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.GetContent()
+    ) { uri: Uri? ->
         if (uri != null) {
-            try {
-                // Разрешение на долгосрочный доступ к URI
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            } catch (_: SecurityException) {
-                // Если не дали persistable — всё равно используем строку, пока процесс жив
-            }
-
-            val uriStr = uri.toString()
-            coverUri = uriStr               // сразу обновляем UI
-            vm.setCover(propertyId, uriStr) // сохраняем в БД через VM
-        }
-    }
-
-    // Если репозиторий обновит объект (например, после setCover) —
-    // подтянем новое значение coverUri в локальный стейт.
-    LaunchedEffect(current?.coverUri) {
-        if (current?.coverUri != coverUri) {
-            coverUri = current?.coverUri
+            val uriString = uri.toString()
+            coverUri = uriString
+            vm.setCover(propertyId, uriString)
         }
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Редактирование объекта") },
+                title = { Text("Редактировать объект") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -112,122 +77,142 @@ fun EditPropertyScreen(
             )
         }
     ) { inner ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(inner)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            // ===== Аватар объекта с кнопкой редактирования =====
+        if (isLoading) {
             Box(
                 modifier = Modifier
-                    .fillMaxWidth(),
+                    .padding(inner)
+                    .fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Box(
-                    modifier = Modifier
-                        .size(120.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant),
-                    contentAlignment = Alignment.Center
+                CircularProgressIndicator()
+            }
+        } else {
+            Column(
+                modifier = Modifier
+                    .padding(inner)
+                    .padding(16.dp)
+                    .fillMaxSize(),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                // Аватар / обложка
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    if (coverUri.isNullOrBlank()) {
-                        // Дефолтная заглушка
-                        Icon(
-                            imageVector = Icons.Filled.Edit, // можешь заменить на Apartment
-                            contentDescription = "Аватар объекта",
-                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.size(40.dp)
-                        )
-                    } else {
-                        AsyncImage(
-                            model = ImageRequest.Builder(LocalContext.current)
-                                .data(coverUri)
-                                .crossfade(true)
-                                .build(),
-                            contentDescription = "Аватар объекта",
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            contentScale = ContentScale.Crop // заполняем весь круг без полей
-                        )
+                    EditPropertyAvatar(coverUri = coverUri)
+                    Spacer(modifier = Modifier.height(8.dp))
+                    TextButton(onClick = { pickImageLauncher.launch("image/*") }) {
+                        Text("Изменить фото")
                     }
                 }
 
-                // Кнопка-карандаш в правом нижнем углу аватара
-                IconButton(
-                    onClick = {
-                        imagePicker.launch(arrayOf("image/*"))
-                    },
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(end = 40.dp) // чуть смещаем от края экрана
-                        .size(32.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.primary)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Edit,
-                        contentDescription = "Изменить аватар",
-                        tint = MaterialTheme.colorScheme.onPrimary
-                    )
-                }
-            }
-
-            // ===== Поля формы =====
-            OutlinedTextField(
-                value = name,
-                onValueChange = { name = it },
-                label = { Text("Название объекта") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = address,
-                onValueChange = { address = it },
-                label = { Text("Адрес") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            OutlinedTextField(
-                value = rentText,
-                onValueChange = { rentText = it },
-                label = { Text("Месячная аренда, ₽") },
-                modifier = Modifier.fillMaxWidth(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Название объекта") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
                 )
-            )
 
-            Spacer(Modifier.height(8.dp))
+                OutlinedTextField(
+                    value = address,
+                    onValueChange = { address = it },
+                    label = { Text("Адрес объекта") },
+                    modifier = Modifier.fillMaxWidth()
+                )
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Button(
-                    onClick = onBack,
-                    modifier = Modifier.weight(1f)
+                OutlinedTextField(
+                    value = rentText,
+                    onValueChange = { rentText = it },
+                    label = { Text("Ежемесячная аренда, ₽") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = leaseFromText,
+                    onValueChange = { leaseFromText = it },
+                    label = { Text("Договор аренды: с (дата)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = leaseToText,
+                    onValueChange = { leaseToText = it },
+                    label = { Text("Договор аренды: по (дата)") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Spacer(modifier = Modifier.weight(1f))
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    Text("Отмена")
-                }
-
-                Button(
-                    onClick = {
-                        val rent = rentText.toDoubleOrNull()
-                        vm.updateProperty(
-                            id = propertyId,
-                            name = name,
-                            address = address.ifBlank { null },
-                            monthlyRent = rent
-                        )
-                        onBack()
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Сохранить")
+                    OutlinedButton(
+                        onClick = onBack,
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Отмена")
+                    }
+                    Button(
+                        onClick = {
+                            val rent = rentText.toDoubleOrNull()
+                            vm.updateProperty(
+                                id = propertyId,
+                                name = name,
+                                address = address.ifBlank { null },
+                                monthlyRent = rent,
+                                leaseFrom = leaseFromText.ifBlank { null },
+                                leaseTo = leaseToText.ifBlank { null }
+                            )
+                            onBack()
+                        },
+                        enabled = name.isNotBlank(),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Сохранить")
+                    }
                 }
             }
+        }
+    }
+}
+
+@Composable
+private fun EditPropertyAvatar(
+    coverUri: String?,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+
+    if (!coverUri.isNullOrBlank()) {
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(coverUri)
+                .crossfade(true)
+                .build(),
+            contentDescription = null,
+            modifier = modifier
+                .size(96.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Box(
+            modifier = modifier
+                .size(96.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Apartment,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 }

@@ -9,25 +9,36 @@ import java.time.LocalDate
 
 interface RealEstateRepository {
 
-    // Properties
+    // ---------- Properties ----------
+
     fun properties(userId: String): Flow<List<Property>>
+
     suspend fun addProperty(userId: String, property: Property)
+
     suspend fun getProperty(userId: String, id: String): Property?
+
     suspend fun updateProperty(
         userId: String,
         id: String,
         name: String,
         address: String?,
-        monthlyRent: Double?
+        monthlyRent: Double?,
+        leaseFrom: String?,
+        leaseTo: String?
     )
 
     suspend fun deletePropertyWithRelations(userId: String, id: String)
+
     suspend fun setPropertyCover(userId: String, propertyId: String, coverUri: String?)
 
-    // Transactions
+    // ---------- Transactions ----------
+
     fun transactions(userId: String): Flow<List<Transaction>>
+
     suspend fun transactionsFor(userId: String, propertyId: String): List<Transaction>
+
     suspend fun addTransaction(userId: String, tx: Transaction)
+
     suspend fun updateTransaction(
         userId: String,
         id: String,
@@ -39,8 +50,10 @@ interface RealEstateRepository {
 
     suspend fun deleteTransaction(userId: String, id: String)
 
-    // Attachments
+    // ---------- Attachments ----------
+
     suspend fun listAttachments(userId: String, propertyId: String): List<Attachment>
+
     suspend fun addAttachment(
         userId: String,
         propertyId: String,

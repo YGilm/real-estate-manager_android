@@ -1,28 +1,29 @@
 package com.example.my_project.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.outlined.Apartment
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
+import coil.request.ImageRequest
 import com.example.my_project.data.model.Property
-import com.example.my_project.data.model.Transaction
-import com.example.my_project.data.model.TxType
 import com.example.my_project.ui.RealEstateViewModel
-import com.example.my_project.ui.util.moneyFormat
-import com.example.my_project.ui.util.moneyFormatPlain
-import com.example.my_project.ui.util.monthName
-import java.time.LocalDate
 
-@ExperimentalMaterial3Api
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PropertiesListScreen(
     vm: RealEstateViewModel,
@@ -31,9 +32,6 @@ fun PropertiesListScreen(
     onBack: () -> Unit
 ) {
     val properties by vm.properties.collectAsState()
-    val transactions by vm.transactions.collectAsState()
-
-    val currentYear = remember { LocalDate.now().year }
 
     Scaffold(
         topBar = {
@@ -41,99 +39,144 @@ fun PropertiesListScreen(
                 title = { Text("Объекты недвижимости") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "Назад"
+                        )
                     }
-                },
-                actions = {
-                    TextButton(onClick = onAdd) { Text("Добавить") }
                 }
             )
+        },
+        floatingActionButton = {
+            FloatingActionButton(onClick = onAdd) {
+                Icon(Icons.Filled.Add, contentDescription = "Добавить объект")
+            }
         }
-    ) { padding ->
+    ) { inner ->
         if (properties.isEmpty()) {
             Box(
-                Modifier
-                    .fillMaxSize()
-                    .padding(padding),
+                modifier = Modifier
+                    .padding(inner)
+                    .fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Нет объектов. Добавьте первый.")
+                Text("Пока нет объектов")
             }
         } else {
             LazyColumn(
                 modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding)
-                    .padding(16.dp),
+                    .padding(inner)
+                    .fillMaxSize(),
+                contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(properties) { p ->
-                    val txsForYear = remember(transactions, p.id, currentYear) {
-                        transactions.filter { it.propertyId == p.id && it.date.year == currentYear }
-                    }
-                    val income = txsForYear.filter { it.type == TxType.INCOME }.sumOf { it.amount }
-                    val expense =
-                        txsForYear.filter { it.type == TxType.EXPENSE }.sumOf { it.amount }
-                    val total = income - expense
-
-                    ElevatedCard(
-                        onClick = { onOpen(p.id) },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Column(Modifier.padding(14.dp)) {
-                            // Заголовок: имя + подпись "Текущий год"
-                            Text(
-                                p.name,
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold,
-                                maxLines = 1
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                "Текущий год: $currentYear",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = Color.Gray
-                            )
-                            Spacer(Modifier.height(10.dp))
-
-                            // Суммы
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("Доход:")
-                                Text(
-                                    moneyFormat(income, TxType.INCOME),
-                                    color = Color(0xFF2E7D32),
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("Расход:")
-                                Text(
-                                    moneyFormat(expense, TxType.EXPENSE), // будет с минусом
-                                    color = Color(0xFFC62828),
-                                    fontWeight = FontWeight.Medium
-                                )
-                            }
-                            HorizontalDivider(Modifier.padding(vertical = 6.dp))
-                            Row(
-                                Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text("Итого:", fontWeight = FontWeight.SemiBold)
-                                Text(
-                                    moneyFormatPlain(total),
-                                    fontWeight = FontWeight.SemiBold
-                                )
-                            }
-                        }
-                    }
+                items(properties, key = { it.id }) { property ->
+                    PropertyListItem(
+                        property = property,
+                        onClick = { onOpen(property.id) }
+                    )
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun PropertyListItem(
+    property: Property,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            PropertyAvatarSmall(imageUrl = property.coverUri)
+
+            Spacer(Modifier.width(12.dp))
+
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = property.name,
+                    style = MaterialTheme.typography.titleMedium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                property.address?.takeIf { it.isNotBlank() }?.let { addr ->
+                    Text(
+                        text = addr,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+
+                buildLeaseText(property.leaseFrom, property.leaseTo)?.let { leaseText ->
+                    Text(
+                        text = leaseText,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun PropertyAvatarSmall(
+    imageUrl: String?,
+    modifier: Modifier = Modifier
+) {
+    val context = LocalContext.current
+
+    if (!imageUrl.isNullOrBlank()) {
+        AsyncImage(
+            model = ImageRequest.Builder(context)
+                .data(imageUrl)
+                .crossfade(true)
+                .build(),
+            contentDescription = null,
+            modifier = modifier
+                .size(48.dp)
+                .clip(CircleShape),
+            contentScale = ContentScale.Crop
+        )
+    } else {
+        Box(
+            modifier = modifier
+                .size(48.dp)
+                .clip(CircleShape)
+                .background(MaterialTheme.colorScheme.surfaceVariant),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Apartment,
+                contentDescription = null,
+                tint = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+    }
+}
+
+private fun buildLeaseText(from: String?, to: String?): String? {
+    val fromClean = from?.takeIf { it.isNotBlank() }
+    val toClean = to?.takeIf { it.isNotBlank() }
+
+    return when {
+        fromClean == null && toClean == null -> "Договор аренды не указан"
+        fromClean != null && toClean != null -> "Договор аренды: с $fromClean по $toClean"
+        fromClean != null -> "Договор аренды: с $fromClean"
+        else -> "Договор аренды: по $toClean"
     }
 }

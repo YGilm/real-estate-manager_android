@@ -10,5 +10,7 @@ data class PropertyEntity(
     val name: String,
     val address: String?,
     val monthlyRent: Double?,
-    val coverUri: String?
+    val coverUri: String?,
+    val leaseFrom: String?,   // договор c
+    val leaseTo: String?      // договор по
 )

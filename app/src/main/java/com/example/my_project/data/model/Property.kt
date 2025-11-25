@@ -7,5 +7,7 @@ data class Property(
     val name: String,
     val address: String? = null,
     val monthlyRent: Double? = null,
-    val coverUri: String? = null
+    val coverUri: String? = null,
+    val leaseFrom: String? = null,
+    val leaseTo: String? = null
 )

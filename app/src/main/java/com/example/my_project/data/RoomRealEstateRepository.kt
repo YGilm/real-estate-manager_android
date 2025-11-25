@@ -27,6 +27,7 @@ class RoomRealEstateRepository @Inject constructor(
 ) : RealEstateRepository {
 
     // ---------- Properties ----------
+
     override fun properties(userId: String): Flow<List<Property>> =
         propertyDao.list(userId).map { list ->
             list.map {
@@ -35,7 +36,9 @@ class RoomRealEstateRepository @Inject constructor(
                     name = it.name,
                     address = it.address,
                     monthlyRent = it.monthlyRent,
-                    coverUri = it.coverUri
+                    coverUri = it.coverUri,
+                    leaseFrom = it.leaseFrom,
+                    leaseTo = it.leaseTo
                 )
             }
         }
@@ -50,7 +53,9 @@ class RoomRealEstateRepository @Inject constructor(
                     name = property.name,
                     address = property.address,
                     monthlyRent = property.monthlyRent,
-                    coverUri = property.coverUri
+                    coverUri = property.coverUri,
+                    leaseFrom = property.leaseFrom,
+                    leaseTo = property.leaseTo
                 )
             )
         }
@@ -63,7 +68,9 @@ class RoomRealEstateRepository @Inject constructor(
                     name = it.name,
                     address = it.address,
                     monthlyRent = it.monthlyRent,
-                    coverUri = it.coverUri
+                    coverUri = it.coverUri,
+                    leaseFrom = it.leaseFrom,
+                    leaseTo = it.leaseTo
                 )
             }
         }
@@ -73,14 +80,18 @@ class RoomRealEstateRepository @Inject constructor(
         id: String,
         name: String,
         address: String?,
-        monthlyRent: Double?
+        monthlyRent: Double?,
+        leaseFrom: String?,
+        leaseTo: String?
     ) = withContext(Dispatchers.IO) {
         val existing = propertyDao.getById(userId, id) ?: return@withContext
         propertyDao.upsert(
             existing.copy(
                 name = name,
                 address = address,
-                monthlyRent = monthlyRent
+                monthlyRent = monthlyRent,
+                leaseFrom = leaseFrom,
+                leaseTo = leaseTo
             )
         )
     }
@@ -98,48 +109,50 @@ class RoomRealEstateRepository @Inject constructor(
         }
 
     // ---------- Transactions ----------
+
     override fun transactions(userId: String): Flow<List<Transaction>> =
         transactionDao.listAll(userId).map { list ->
-            list.map {
+            list.map { e ->
                 Transaction(
-                    id = it.id,
-                    propertyId = it.propertyId,
-                    type = if (it.isIncome) TxType.INCOME else TxType.EXPENSE,
-                    amount = it.amount,
-                    date = LocalDate.parse(it.dateIso),
-                    note = it.note
+                    id = e.id,
+                    propertyId = e.propertyId,
+                    type = if (e.isIncome) TxType.INCOME else TxType.EXPENSE,
+                    amount = e.amount,
+                    date = LocalDate.parse(e.dateIso),
+                    note = e.note
                 )
             }
         }
 
-    override suspend fun transactionsFor(userId: String, propertyId: String): List<Transaction> =
-        withContext(Dispatchers.IO) {
-            transactionDao.listForProperty(userId, propertyId).map {
-                Transaction(
-                    id = it.id,
-                    propertyId = it.propertyId,
-                    type = if (it.isIncome) TxType.INCOME else TxType.EXPENSE,
-                    amount = it.amount,
-                    date = LocalDate.parse(it.dateIso),
-                    note = it.note
-                )
-            }
-        }
-
-    override suspend fun addTransaction(userId: String, tx: Transaction) =
-        withContext(Dispatchers.IO) {
-            val id = if (tx.id.isBlank()) UUID.randomUUID().toString() else tx.id
-            transactionDao.upsert(
-                TransactionEntity(
-                    id = id,
-                    userId = userId,
-                    propertyId = tx.propertyId,
-                    isIncome = (tx.type == TxType.INCOME),
-                    amount = tx.amount,
-                    dateIso = tx.date.toString(),
-                    note = tx.note
-                )
+    override suspend fun transactionsFor(
+        userId: String,
+        propertyId: String
+    ): List<Transaction> = withContext(Dispatchers.IO) {
+        transactionDao.listForProperty(userId, propertyId).map { e ->
+            Transaction(
+                id = e.id,
+                propertyId = e.propertyId,
+                type = if (e.isIncome) TxType.INCOME else TxType.EXPENSE,
+                amount = e.amount,
+                date = LocalDate.parse(e.dateIso),
+                note = e.note
             )
+        }
+    }
+
+    override suspend fun addTransaction(userId: String, transaction: Transaction) =
+        withContext(Dispatchers.IO) {
+            val id = transaction.id.ifBlank { UUID.randomUUID().toString() }
+            val entity = TransactionEntity(
+                id = id,
+                userId = userId,
+                propertyId = transaction.propertyId,
+                isIncome = transaction.type == TxType.INCOME,
+                amount = transaction.amount,
+                dateIso = transaction.date.toString(), // yyyy-MM-dd
+                note = transaction.note
+            )
+            transactionDao.upsert(entity)
         }
 
     override suspend fun updateTransaction(
@@ -153,7 +166,7 @@ class RoomRealEstateRepository @Inject constructor(
         val existing = transactionDao.getById(userId, id) ?: return@withContext
         transactionDao.upsert(
             existing.copy(
-                isIncome = (type == TxType.INCOME),
+                isIncome = type == TxType.INCOME,
                 amount = amount,
                 dateIso = date.toString(),
                 note = note
@@ -167,19 +180,21 @@ class RoomRealEstateRepository @Inject constructor(
         }
 
     // ---------- Attachments ----------
-    override suspend fun listAttachments(userId: String, propertyId: String): List<Attachment> =
-        withContext(Dispatchers.IO) {
-            val entities = attachmentDao.listForProperty(userId, propertyId)
-            entities.map { e ->
-                // ВАЖНО: доменная модель Attachment = (id, name, mimeType, uri)
-                Attachment(
-                    e.id,
-                    e.name,
-                    e.mimeType,
-                    e.uri
-                )
-            }
+
+    override suspend fun listAttachments(
+        userId: String,
+        propertyId: String
+    ): List<Attachment> = withContext(Dispatchers.IO) {
+        val entities = attachmentDao.listForProperty(userId, propertyId)
+        entities.map { e ->
+            Attachment(
+                id = e.id,
+                name = e.name,
+                mimeType = e.mimeType,
+                uri = e.uri
+            )
         }
+    }
 
     override suspend fun addAttachment(
         userId: String,
@@ -189,15 +204,13 @@ class RoomRealEstateRepository @Inject constructor(
         uri: String
     ) = withContext(Dispatchers.IO) {
         val id = UUID.randomUUID().toString()
-        // Позиционные аргументы под Room-сущность:
-        // AttachmentEntity(id, userId, propertyId, name, mimeType, uri)
         val entity = AttachmentEntity(
-            id,
-            userId,
-            propertyId,
-            name,
-            mime,
-            uri
+            id = id,
+            userId = userId,
+            propertyId = propertyId,
+            name = name,
+            mimeType = mime,
+            uri = uri
         )
         attachmentDao.upsert(entity)
     }

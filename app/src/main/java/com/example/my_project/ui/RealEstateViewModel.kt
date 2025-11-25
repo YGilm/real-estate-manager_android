@@ -35,12 +35,26 @@ class RealEstateViewModel @Inject constructor(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     // ---- Property ----
-    fun addProperty(name: String, address: String?, monthlyRent: Double?) {
+    fun addProperty(
+        name: String,
+        address: String?,
+        monthlyRent: Double?,
+        leaseFrom: String? = null,
+        leaseTo: String? = null,
+        coverUri: String? = null
+    ) {
         val uid = userIdFlow.value ?: return
         viewModelScope.launch {
             repo.addProperty(
                 uid,
-                Property(name = name, address = address, monthlyRent = monthlyRent)
+                Property(
+                    name = name,
+                    address = address,
+                    monthlyRent = monthlyRent,
+                    leaseFrom = leaseFrom,
+                    leaseTo = leaseTo,
+                    coverUri = coverUri
+                )
             )
         }
     }
@@ -50,9 +64,18 @@ class RealEstateViewModel @Inject constructor(
         return repo.getProperty(uid, id)
     }
 
-    fun updateProperty(id: String, name: String, address: String?, monthlyRent: Double?) {
+    fun updateProperty(
+        id: String,
+        name: String,
+        address: String?,
+        monthlyRent: Double?,
+        leaseFrom: String?,
+        leaseTo: String?
+    ) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch { repo.updateProperty(uid, id, name, address, monthlyRent) }
+        viewModelScope.launch {
+            repo.updateProperty(uid, id, name, address, monthlyRent, leaseFrom, leaseTo)
+        }
     }
 
     fun deleteProperty(id: String) {
