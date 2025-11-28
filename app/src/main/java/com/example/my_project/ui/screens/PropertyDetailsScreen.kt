@@ -16,10 +16,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.automirrored.outlined.Assignment
+import androidx.compose.material.icons.filled.AttachMoney
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.outlined.Apartment
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.ElevatedButton
 import androidx.compose.material3.Icon
@@ -27,10 +31,14 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -40,6 +48,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.my_project.data.model.TxType
@@ -55,12 +64,21 @@ fun PropertyDetailsScreen(
     onEditProperty: () -> Unit,
     onOpenStatsForProperty: () -> Unit,
     onOpenBills: () -> Unit,
-    onOpenTransactions: () -> Unit,
+    onOpenTransactions: () -> Unit
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Объект") },
+                title = {
+                    val properties by vm.properties.collectAsState()
+                    val property = properties.firstOrNull { it.id == propertyId }
+                    Text(
+                        text = property?.name?.takeIf { it.isNotBlank() }
+                            ?: "Объект недвижимости",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(
@@ -73,18 +91,18 @@ fun PropertyDetailsScreen(
                     IconButton(onClick = onEditProperty) {
                         Icon(
                             imageVector = Icons.Filled.Edit,
-                            contentDescription = "Редактировать"
+                            contentDescription = "Редактировать объект"
                         )
                     }
                 }
             )
         }
-    ) { inner ->
+    ) { paddingValues ->
         PropertyDetailsContent(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(inner)
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+                .padding(paddingValues)
+                .padding(16.dp),
             vm = vm,
             propertyId = propertyId,
             onOpenStatsForProperty = onOpenStatsForProperty,
@@ -127,6 +145,31 @@ private fun PropertyDetailsContent(
         .sumOf { it.amount }
     val total = income - expense
 
+    var featureStubMessage by remember { mutableStateOf<String?>(null) }
+
+    if (featureStubMessage != null) {
+        AlertDialog(
+            onDismissRequest = { featureStubMessage = null },
+            icon = {
+                Text(
+                    text = "😿",
+                    fontSize = 40.sp
+                )
+            },
+            title = {
+                Text("Котик грустит")
+            },
+            text = {
+                Text(featureStubMessage!!)
+            },
+            confirmButton = {
+                TextButton(onClick = { featureStubMessage = null }) {
+                    Text("Не грусти, котик")
+                }
+            }
+        )
+    }
+
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(16.dp)
@@ -143,7 +186,8 @@ private fun PropertyDetailsContent(
             Text(
                 text = titleText,
                 style = MaterialTheme.typography.titleLarge,
-                maxLines = 1,
+                fontWeight = FontWeight.SemiBold,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
 
@@ -173,22 +217,28 @@ private fun PropertyDetailsContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Детали (заглушка с котиком)
             ElevatedButton(
-                onClick = onEditProperty,
+                onClick = {
+                    featureStubMessage =
+                        "Потому что пока не может увидеть детали объекта. " +
+                                "Мы уже работаем над этим функционалом, чтобы котик больше не расстраивался."
+                },
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
             ) {
-                Icon(Icons.Filled.Edit, contentDescription = null)
+                Icon(Icons.Filled.Info, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
-                Text("Редактировать")
+                Text("Детали")
             }
 
+            // Транзакции — рабочая кнопка
             ElevatedButton(
                 onClick = onOpenTransactions,
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
             ) {
-                Icon(Icons.AutoMirrored.Outlined.Assignment, contentDescription = null)
+                Icon(Icons.Filled.AttachMoney, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
                 Text("Транзакции")
             }
@@ -198,22 +248,28 @@ private fun PropertyDetailsContent(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Показания (заглушка с котиком)
             ElevatedButton(
-                onClick = onOpenBills,
+                onClick = {
+                    featureStubMessage =
+                        "Котик грустит, потому что пока не может увидеть показания по этому объекту. " +
+                                "Мы уже работаем над этим функционалом, чтобы не расстраивать котика."
+                },
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
             ) {
-                Icon(Icons.Filled.ReceiptLong, contentDescription = null)
+                Icon(Icons.Filled.Speed, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
-                Text("Счета")
+                Text("Показания")
             }
 
+            // Статистика — рабочая
             ElevatedButton(
                 onClick = onOpenStatsForProperty,
                 modifier = Modifier.weight(1f),
                 contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
             ) {
-                Icon(Icons.Filled.ReceiptLong, contentDescription = null)
+                Icon(Icons.Filled.Insights, contentDescription = null)
                 Spacer(Modifier.size(8.dp))
                 Text("Статистика")
             }
@@ -250,8 +306,15 @@ private fun PropertyDetailsContent(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text("Расход")
+
+                        val expenseText = if (expense == 0.0) {
+                            moneyFormatPlain(expense)          // "0 ₽" — без минуса
+                        } else {
+                            "-${moneyFormatPlain(expense)}"    // "-10 000 ₽"
+                        }
+
                         Text(
-                            text = moneyFormatPlain(expense),
+                            text = expenseText,
                             color = Color(0xFFC62828),
                             fontWeight = FontWeight.SemiBold
                         )
@@ -266,11 +329,7 @@ private fun PropertyDetailsContent(
                         Text("Итого")
                         Text(
                             text = moneyFormatPlain(total),
-                            color = when {
-                                total > 0 -> Color(0xFF2E7D32)
-                                total < 0 -> Color(0xFFC62828)
-                                else -> MaterialTheme.colorScheme.onSurface
-                            },
+                            color = MaterialTheme.colorScheme.onSurface,
                             fontWeight = FontWeight.SemiBold
                         )
                     }
@@ -293,30 +352,31 @@ private fun PropertyAvatar(
 ) {
     val context = LocalContext.current
 
-    if (!imageUrl.isNullOrBlank()) {
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(imageUrl)
-                .crossfade(true)
-                .build(),
+    Box(
+        modifier = modifier
+            .size(120.dp)
+            .clip(androidx.compose.foundation.shape.CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center
+    ) {
+        // Дефолтная иконка — всегда рисуем
+        Icon(
+            imageVector = Icons.Outlined.Apartment,
             contentDescription = null,
-            modifier = modifier
-                .size(96.dp)
-                .clip(androidx.compose.foundation.shape.CircleShape),
-            contentScale = ContentScale.Crop
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    } else {
-        Box(
-            modifier = modifier
-                .size(96.dp)
-                .clip(androidx.compose.foundation.shape.CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Apartment,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+
+        // Если есть URL – пытаемся поверх нарисовать картинку
+        if (!imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(imageUrl)
+                    .crossfade(true)
+                    .build(),
+                contentDescription = "Обложка объекта",
+                modifier = Modifier
+                    .matchParentSize(), // заполняем весь круг
+                contentScale = ContentScale.Crop
             )
         }
     }

@@ -31,6 +31,7 @@ import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -67,6 +68,12 @@ fun StatsScreen(
     var selectedPropertyId by rememberSaveable { mutableStateOf<String?>(preselectedPropertyId) }
     // 0 = Месяц, 1 = Год, 2 = Всё время
     var tab by rememberSaveable { mutableStateOf(1) }
+
+    LaunchedEffect(preselectedPropertyId) {
+        if (!preselectedPropertyId.isNullOrBlank()) {
+            selectedPropertyId = preselectedPropertyId
+        }
+    }
 
     val filteredTxs = remember(txs, selectedPropertyId) {
         if (selectedPropertyId.isNullOrBlank()) txs
@@ -116,6 +123,7 @@ fun StatsScreen(
                     txs = filteredTxs,
                     onOpenMonth = { y, m -> onOpenMonth(y, m, selectedPropertyId) }
                 )
+
                 2 -> AllTimeTab(txs = filteredTxs)
             }
         }
@@ -151,7 +159,8 @@ private fun PropertyFilterRow(
                 maxLines = 1,               // 👈 на всякий случай
                 label = { Text("Фильтр") },
                 trailingIcon = {
-                    val icon = if (expanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
+                    val icon =
+                        if (expanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
                     Icon(
                         imageVector = icon,
                         contentDescription = "Раскрыть",
@@ -196,23 +205,141 @@ private fun PropertyFilterRow(
 @Composable
 private fun MonthTab(txs: List<Transaction>) {
     val now = remember { LocalDate.now() }
-    val currentYear = now.year
-    val currentMonth = now.monthValue
 
-    val monthTxs = remember(txs, currentYear, currentMonth) {
-        txs.filter { it.date.year == currentYear && it.date.monthValue == currentMonth }
+    // Доступные года из транзакций (или текущий год, если данных пока нет)
+    val years = remember(txs) {
+        txs.map { it.date.year }
+            .distinct()
+            .sortedDescending()
+            .ifEmpty { listOf(now.year) }
+    }
+
+    var yearExpanded by remember { mutableStateOf(false) }
+    var monthExpanded by remember { mutableStateOf(false) }
+
+    var selectedYear by rememberSaveable(years) {
+        mutableStateOf(if (years.contains(now.year)) now.year else years.first())
+    }
+
+    // Месяцы, в которых есть транзакции в выбранном году (если пусто — показываем 1..12)
+    val monthsForYear = remember(txs, selectedYear) {
+        txs.filter { it.date.year == selectedYear }
+            .map { it.date.monthValue }
+            .distinct()
+            .sorted()
+            .ifEmpty { (1..12).toList() }
+    }
+
+    var selectedMonth by rememberSaveable(selectedYear) {
+        mutableStateOf(
+            if (selectedYear == now.year && monthsForYear.contains(now.monthValue)) now.monthValue
+            else monthsForYear.first()
+        )
+    }
+
+    // Если при переключении года выбранный месяц исчез (нет данных) — приводим к валидному
+    if (!monthsForYear.contains(selectedMonth)) {
+        selectedMonth = monthsForYear.first()
+    }
+
+    // UI выбора
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(modifier = Modifier.weight(1f)) {
+            OutlinedTextField(
+                value = selectedYear.toString(),
+                onValueChange = {},
+                readOnly = true,
+                singleLine = true,
+                label = { Text("Год") },
+                trailingIcon = {
+                    val icon = if (yearExpanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
+                    Icon(icon, contentDescription = null, modifier = Modifier.clickable { yearExpanded = !yearExpanded })
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { yearExpanded = true }
+            )
+
+            DropdownMenu(
+                expanded = yearExpanded,
+                onDismissRequest = { yearExpanded = false }
+            ) {
+                years.forEach { y ->
+                    DropdownMenuItem(
+                        text = { Text(y.toString()) },
+                        onClick = {
+                            yearExpanded = false
+                            selectedYear = y
+                        }
+                    )
+                }
+            }
+        }
+
+        Box(modifier = Modifier.weight(1f)) {
+            OutlinedTextField(
+                value = monthName(selectedMonth),
+                onValueChange = {},
+                readOnly = true,
+                singleLine = true,
+                label = { Text("Месяц") },
+                trailingIcon = {
+                    val icon = if (monthExpanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
+                    Icon(icon, contentDescription = null, modifier = Modifier.clickable { monthExpanded = !monthExpanded })
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable { monthExpanded = true }
+            )
+
+            DropdownMenu(
+                expanded = monthExpanded,
+                onDismissRequest = { monthExpanded = false }
+            ) {
+                monthsForYear.forEach { m ->
+                    DropdownMenuItem(
+                        text = { Text(monthName(m)) },
+                        onClick = {
+                            monthExpanded = false
+                            selectedMonth = m
+                        }
+                    )
+                }
+            }
+        }
+    }
+
+    Spacer(Modifier.height(12.dp))
+
+    val monthTxs = remember(txs, selectedYear, selectedMonth) {
+        txs.filter { it.date.year == selectedYear && it.date.monthValue == selectedMonth }
             .sortedByDescending { it.date }
     }
 
     val totals = remember(monthTxs) { monthTxs.computeTotals() }
 
-    Text("Текущий месяц: ${monthName(currentMonth)} $currentYear", fontWeight = FontWeight.SemiBold)
+    Text(
+        "Месяц: ${monthName(selectedMonth)} $selectedYear",
+        fontWeight = FontWeight.SemiBold
+    )
     Spacer(Modifier.height(8.dp))
     TotalsBlock(totals)
 
     Spacer(Modifier.height(16.dp))
     Text("Транзакции", style = MaterialTheme.typography.titleMedium)
     Spacer(Modifier.height(8.dp))
+
+    if (monthTxs.isEmpty()) {
+        Text(
+            "Нет транзакций за выбранный месяц",
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+        return
+    }
 
     val dateFmt = remember { DateTimeFormatter.ofPattern("dd.MM.yyyy") }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -279,7 +406,8 @@ private fun YearTab(
                 maxLines = 1,
                 label = { Text("Год") },
                 trailingIcon = {
-                    val icon = if (expanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
+                    val icon =
+                        if (expanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
                     Icon(
                         imageVector = icon,
                         contentDescription = "Раскрыть",
