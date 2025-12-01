@@ -38,6 +38,35 @@ interface PropertyDao {
     suspend fun updateCover(userId: String, id: String, coverUri: String?)
 }
 
+// ---------- PROPERTY DETAILS ----------
+@Dao
+interface PropertyDetailsDao {
+    @Query("SELECT * FROM property_details WHERE userId = :userId AND propertyId = :propertyId LIMIT 1")
+    fun observe(userId: String, propertyId: String): Flow<PropertyDetailsEntity?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: PropertyDetailsEntity)
+
+    @Query("DELETE FROM property_details WHERE userId = :userId AND propertyId = :propertyId")
+    suspend fun deleteForProperty(userId: String, propertyId: String)
+}
+
+// ---------- PROPERTY PHOTOS ----------
+@Dao
+interface PropertyPhotoDao {
+    @Query("SELECT * FROM property_photos WHERE userId = :userId AND propertyId = :propertyId ORDER BY createdAt DESC")
+    fun observeForProperty(userId: String, propertyId: String): Flow<List<PropertyPhotoEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(list: List<PropertyPhotoEntity>)
+
+    @Query("DELETE FROM property_photos WHERE userId = :userId AND id = :id")
+    suspend fun delete(userId: String, id: String)
+
+    @Query("DELETE FROM property_photos WHERE userId = :userId AND propertyId = :propertyId")
+    suspend fun deleteForProperty(userId: String, propertyId: String)
+}
+
 // ---------- TRANSACTIONS ----------
 @Dao
 interface TransactionDao {
@@ -60,9 +89,13 @@ interface TransactionDao {
     suspend fun deleteForProperty(userId: String, propertyId: String)
 }
 
-// ---------- ATTACHMENTS ----------
+// ---------- ATTACHMENTS (documents) ----------
 @Dao
 interface AttachmentDao {
+    @Query("SELECT * FROM attachments WHERE userId = :userId AND propertyId = :propertyId ORDER BY id DESC")
+    fun observeForProperty(userId: String, propertyId: String): Flow<List<AttachmentEntity>>
+
+    // оставляем старый API (может быть где-то используется)
     @Query("SELECT * FROM attachments WHERE userId = :userId AND propertyId = :propertyId ORDER BY id DESC")
     suspend fun listForProperty(userId: String, propertyId: String): List<AttachmentEntity>
 

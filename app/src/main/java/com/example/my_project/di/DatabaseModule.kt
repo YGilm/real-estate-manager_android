@@ -7,6 +7,8 @@ import com.example.my_project.data.db.AttachmentDao
 import com.example.my_project.data.db.PropertyDao
 import com.example.my_project.data.db.TransactionDao
 import com.example.my_project.data.db.UserDao
+import com.example.my_project.data.db.PropertyDetailsDao
+import com.example.my_project.data.db.PropertyPhotoDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -34,4 +36,9 @@ object DatabaseModule {
     fun provideTransactionDao(db: AppDatabase): TransactionDao = db.transactionDao()
     @Provides
     fun provideAttachmentDao(db: AppDatabase): AttachmentDao = db.attachmentDao()
+    @Provides
+    fun providePropertyDetailsDao(db: AppDatabase): PropertyDetailsDao = db.propertyDetailsDao()
+
+    @Provides
+    fun providePropertyPhotoDao(db: AppDatabase): PropertyPhotoDao = db.propertyPhotoDao()
 }

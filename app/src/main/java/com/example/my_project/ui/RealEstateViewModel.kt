@@ -6,6 +6,8 @@ import com.example.my_project.auth.UserSession
 import com.example.my_project.data.RealEstateRepository
 import com.example.my_project.data.model.Attachment
 import com.example.my_project.data.model.Property
+import com.example.my_project.data.model.PropertyDetails
+import com.example.my_project.data.model.PropertyPhoto
 import com.example.my_project.data.model.Transaction
 import com.example.my_project.data.model.TxType
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -88,23 +90,35 @@ class RealEstateViewModel @Inject constructor(
         viewModelScope.launch { repo.setPropertyCover(uid, propertyId, coverUri) }
     }
 
+    // ---- Property Details ----
+    fun propertyDetails(propertyId: String): Flow<PropertyDetails?> =
+        userIdFlow.flatMapLatest { uid ->
+            if (uid == null) flowOf(null) else repo.propertyDetails(uid, propertyId)
+        }
+
+    fun savePropertyDetails(propertyId: String, description: String?, areaSqm: String?) {
+        val uid = userIdFlow.value ?: return
+        viewModelScope.launch {
+            repo.upsertPropertyDetails(uid, propertyId, description, areaSqm)
+        }
+    }
+
+    fun propertyPhotos(propertyId: String): Flow<List<PropertyPhoto>> =
+        userIdFlow.flatMapLatest { uid ->
+            if (uid == null) flowOf(emptyList()) else repo.propertyPhotos(uid, propertyId)
+        }
+
+    fun addPropertyPhotos(propertyId: String, uris: List<String>) {
+        val uid = userIdFlow.value ?: return
+        viewModelScope.launch { repo.addPropertyPhotos(uid, propertyId, uris) }
+    }
+
+    fun deletePropertyPhoto(photoId: String) {
+        val uid = userIdFlow.value ?: return
+        viewModelScope.launch { repo.deletePropertyPhoto(uid, photoId) }
+    }
+
     // ---- Transactions ----
-    suspend fun transactionsFor(propertyId: String): List<Transaction> {
-        val uid = userIdFlow.value ?: return emptyList()
-        return repo.transactionsFor(uid, propertyId)
-    }
-
-    /**
-     * СТАРАЯ версия — без даты (используем LocalDate.now()).
-     * Нужна, чтобы не ломать существующие вызовы без date.
-     */
-    fun addTransaction(propertyId: String, isIncome: Boolean, amount: Double, note: String?) {
-        addTransaction(propertyId, isIncome, amount, LocalDate.now(), note)
-    }
-
-    /**
-     * НОВАЯ перегрузка — с явной датой (поддерживает вызовы вида date = ...).
-     */
     fun addTransaction(
         propertyId: String,
         isIncome: Boolean,
@@ -114,16 +128,7 @@ class RealEstateViewModel @Inject constructor(
     ) {
         val uid = userIdFlow.value ?: return
         viewModelScope.launch {
-            repo.addTransaction(
-                uid,
-                Transaction(
-                    propertyId = propertyId,
-                    type = if (isIncome) TxType.INCOME else TxType.EXPENSE,
-                    amount = amount,
-                    date = date,
-                    note = note
-                )
-            )
+            repo.addTransaction(uid, propertyId, if (isIncome) TxType.INCOME else TxType.EXPENSE, amount, date, note)
         }
     }
 
@@ -136,14 +141,7 @@ class RealEstateViewModel @Inject constructor(
     ) {
         val uid = userIdFlow.value ?: return
         viewModelScope.launch {
-            repo.updateTransaction(
-                uid,
-                id,
-                if (isIncome) TxType.INCOME else TxType.EXPENSE,
-                amount,
-                date,
-                note
-            )
+            repo.updateTransaction(uid, id, if (isIncome) TxType.INCOME else TxType.EXPENSE, amount, date, note)
         }
     }
 
@@ -152,11 +150,11 @@ class RealEstateViewModel @Inject constructor(
         viewModelScope.launch { repo.deleteTransaction(uid, id) }
     }
 
-    // ---- Attachments ----
-    suspend fun listAttachments(propertyId: String): List<Attachment> {
-        val uid = userIdFlow.value ?: return emptyList()
-        return repo.listAttachments(uid, propertyId)
-    }
+    // ---- Attachments (documents) ----
+    fun attachments(propertyId: String): Flow<List<Attachment>> =
+        userIdFlow.flatMapLatest { uid ->
+            if (uid == null) flowOf(emptyList()) else repo.attachments(uid, propertyId)
+        }
 
     fun addAttachment(propertyId: String, name: String?, mime: String?, uri: String) {
         val uid = userIdFlow.value ?: return

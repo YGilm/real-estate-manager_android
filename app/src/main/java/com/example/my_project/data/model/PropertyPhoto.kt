@@ -1,9 +1,7 @@
 package com.example.my_project.data.model
 
-data class Attachment(
+data class PropertyPhoto(
     val id: String,
     val propertyId: String,
-    val name: String?,
-    val mimeType: String?,
     val uri: String
 )

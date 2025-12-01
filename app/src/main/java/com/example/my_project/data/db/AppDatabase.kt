@@ -5,19 +5,16 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 
-/**
- * Главное правило:
- *  - при каждом изменении схемы (Entity / поля) увеличивай version.
- *  - для production-данных добавляй Migration.
- */
 @Database(
     entities = [
         UserEntity::class,
         PropertyEntity::class,
         TransactionEntity::class,
-        AttachmentEntity::class
+        AttachmentEntity::class,
+        PropertyDetailsEntity::class,
+        PropertyPhotoEntity::class
     ],
-    version = 3,          // ⬅️ было 1, стало 2
+    version = 4,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -27,21 +24,45 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun attachmentDao(): AttachmentDao
 
+    abstract fun propertyDetailsDao(): PropertyDetailsDao
+    abstract fun propertyPhotoDao(): PropertyPhotoDao
+
     companion object {
-        /**
-         * Миграция 1 → 2.
-         *
-         * Предполагается, что в версии 2 в PropertyEntity появились поля:
-         *  - leaseFrom: String?
-         *  - leaseTo: String?
-         *
-         * Если ты ещё НЕ добавлял эти поля в Entity, сначала добавь их там.
-         */
+
         val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(db: SupportSQLiteDatabase) {
-                // новые nullable-поля, поэтому DEFAULT не нужен
                 db.execSQL("ALTER TABLE properties ADD COLUMN leaseFrom TEXT")
                 db.execSQL("ALTER TABLE properties ADD COLUMN leaseTo TEXT")
+            }
+        }
+
+        // ✅ Добавляем таблицы для деталей и фото
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS property_details (
+                        userId TEXT NOT NULL,
+                        propertyId TEXT NOT NULL,
+                        description TEXT,
+                        areaSqm TEXT,
+                        updatedAt INTEGER NOT NULL,
+                        PRIMARY KEY(userId, propertyId)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS property_photos (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        userId TEXT NOT NULL,
+                        propertyId TEXT NOT NULL,
+                        uri TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_property_photos_userId_propertyId ON property_photos(userId, propertyId)")
             }
         }
     }
