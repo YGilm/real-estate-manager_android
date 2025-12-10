@@ -201,8 +201,8 @@ fun PropertyInfoScreen(
         AlertDialog(
             onDismissRequest = { showTenantStub = false },
             icon = { Icon(Icons.Filled.Pets, contentDescription = null, modifier = Modifier.size(72.dp)) },
-            title = { Text("Котик грустит 😿") },
-            text = { Text("Функционал арендатора пока не готов. Мы работаем над этим, чтобы котик не грустил!") },
+            title = { Text("Упс... пока кнопка не работает =(") },
+            text = { Text("Функционал арендатора пока не готов. Мы работаем над этим") },
             confirmButton = { TextButton(onClick = { showTenantStub = false }) { Text("Ок") } }
         )
     }
@@ -256,13 +256,13 @@ fun PropertyInfoScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.HomeWork, contentDescription = null)
                         Spacer(Modifier.width(10.dp))
-                        Text("Паспорт объекта", style = MaterialTheme.typography.titleMedium)
+                        Text("Подробная информация", style = MaterialTheme.typography.titleMedium)
                     }
 
                     Spacer(Modifier.height(6.dp))
 
                     KeyValueRow(
-                        "Арендная ставка",
+                        "Арендная ставка/мес.",
                         property?.monthlyRent?.let { "${formatMoney(it)} ₽" } ?: "—"
                     )
 
@@ -272,19 +272,14 @@ fun PropertyInfoScreen(
 
                     Column {
                         KeyValueRow(
-                            "Ставка за м²",
+                            "Ставка за м²: ",
                             when {
                                 perSqm != null -> "${formatMoney(perSqm)} ₽/м²"
-                                areaVal == null -> "Задайте метраж для расчёта"
+                                areaVal == null -> "Размер не задан"
                                 else -> "—"
                             }
                         )
-                        Text(
-                            text = "в месяц",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
+
                     }
 
                     val lease = buildString {

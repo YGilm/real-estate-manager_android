@@ -123,7 +123,6 @@ fun StatsScreen(
                     txs = filteredTxs,
                     onOpenMonth = { y, m -> onOpenMonth(y, m, selectedPropertyId) }
                 )
-
                 2 -> AllTimeTab(txs = filteredTxs)
             }
         }
@@ -149,14 +148,13 @@ private fun PropertyFilterRow(
     ) {
         Text("Объект:", fontWeight = FontWeight.SemiBold)
 
-        // Якорь для выпадающего меню. Делаем поле однострочным и кликабельным целиком.
         Box {
             OutlinedTextField(
                 value = selectedLabel,
                 onValueChange = {},
                 readOnly = true,
-                singleLine = true,          // 👈 гарантируем одну строку
-                maxLines = 1,               // 👈 на всякий случай
+                singleLine = true,
+                maxLines = 1,
                 label = { Text("Фильтр") },
                 trailingIcon = {
                     val icon =
@@ -170,8 +168,7 @@ private fun PropertyFilterRow(
                     )
                 },
                 modifier = Modifier
-                    .clickable { expanded = true } // клик по строке тоже открывает меню
-                    // контролируем ширину, чтобы текст не переносился из-за узкого контейнера
+                    .clickable { expanded = true }
                     .fillMaxWidth(0.6f)
             )
 
@@ -206,7 +203,7 @@ private fun PropertyFilterRow(
 private fun MonthTab(txs: List<Transaction>) {
     val now = remember { LocalDate.now() }
 
-    // Доступные года из транзакций (или текущий год, если данных пока нет)
+    // Доступные года из транзакций (или текущий год, если данных нет)
     val years = remember(txs) {
         txs.map { it.date.year }
             .distinct()
@@ -221,7 +218,7 @@ private fun MonthTab(txs: List<Transaction>) {
         mutableStateOf(if (years.contains(now.year)) now.year else years.first())
     }
 
-    // Месяцы, в которых есть транзакции в выбранном году (если пусто — показываем 1..12)
+    // Месяцы, в которых есть транзакции в выбранном году (если пусто — 1..12)
     val monthsForYear = remember(txs, selectedYear) {
         txs.filter { it.date.year == selectedYear }
             .map { it.date.monthValue }
@@ -237,12 +234,12 @@ private fun MonthTab(txs: List<Transaction>) {
         )
     }
 
-    // Если при переключении года выбранный месяц исчез (нет данных) — приводим к валидному
+    // Если после смены года выбранный месяц недоступен — поправим
     if (!monthsForYear.contains(selectedMonth)) {
         selectedMonth = monthsForYear.first()
     }
 
-    // UI выбора
+    // Выбор года / месяца
     Row(
         modifier = Modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -256,8 +253,13 @@ private fun MonthTab(txs: List<Transaction>) {
                 singleLine = true,
                 label = { Text("Год") },
                 trailingIcon = {
-                    val icon = if (yearExpanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
-                    Icon(icon, contentDescription = null, modifier = Modifier.clickable { yearExpanded = !yearExpanded })
+                    val icon =
+                        if (yearExpanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.clickable { yearExpanded = !yearExpanded }
+                    )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -272,8 +274,8 @@ private fun MonthTab(txs: List<Transaction>) {
                     DropdownMenuItem(
                         text = { Text(y.toString()) },
                         onClick = {
-                            yearExpanded = false
                             selectedYear = y
+                            yearExpanded = false
                         }
                     )
                 }
@@ -288,8 +290,13 @@ private fun MonthTab(txs: List<Transaction>) {
                 singleLine = true,
                 label = { Text("Месяц") },
                 trailingIcon = {
-                    val icon = if (monthExpanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
-                    Icon(icon, contentDescription = null, modifier = Modifier.clickable { monthExpanded = !monthExpanded })
+                    val icon =
+                        if (monthExpanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
+                    Icon(
+                        imageVector = icon,
+                        contentDescription = null,
+                        modifier = Modifier.clickable { monthExpanded = !monthExpanded }
+                    )
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -304,8 +311,8 @@ private fun MonthTab(txs: List<Transaction>) {
                     DropdownMenuItem(
                         text = { Text(monthName(m)) },
                         onClick = {
-                            monthExpanded = false
                             selectedMonth = m
+                            monthExpanded = false
                         }
                     )
                 }
@@ -315,11 +322,13 @@ private fun MonthTab(txs: List<Transaction>) {
 
     Spacer(Modifier.height(12.dp))
 
+    // ВСЕ транзакции выбранного месяца (список внизу)
     val monthTxs = remember(txs, selectedYear, selectedMonth) {
         txs.filter { it.date.year == selectedYear && it.date.monthValue == selectedMonth }
             .sortedByDescending { it.date }
     }
 
+    // Итоги — считаем через computeTotals(), который уже игнорирует будущие транзакции
     val totals = remember(monthTxs) { monthTxs.computeTotals() }
 
     Text(
@@ -344,16 +353,41 @@ private fun MonthTab(txs: List<Transaction>) {
     val dateFmt = remember { DateTimeFormatter.ofPattern("dd.MM.yyyy") }
     LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(monthTxs) { t ->
+            val today = LocalDate.now()
+            val isFuture = t.date.isAfter(today)
+
             ElevatedCard(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(12.dp)) {
                     Text(
-                        if (t.type == TxType.INCOME) "Доход" else "Расход",
-                        fontWeight = FontWeight.SemiBold
+                        text = if (t.type == TxType.INCOME) "Доход" else "Расход",
+                        fontWeight = FontWeight.SemiBold,
+                        color = if (isFuture)
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        else
+                            MaterialTheme.colorScheme.onSurface
                     )
-                    MoneyLine(type = t.type, amount = t.amount)
-                    Text(t.date.format(dateFmt), style = MaterialTheme.typography.bodySmall)
+                    MonthTxMoneyLine(
+                        type = t.type,
+                        amount = t.amount,
+                        isFuture = isFuture
+                    )
+                    Text(
+                        text = t.date.format(dateFmt),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (isFuture)
+                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        else
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     if (!t.note.isNullOrBlank()) {
-                        Text(t.note!!, style = MaterialTheme.typography.bodySmall)
+                        Text(
+                            text = t.note!!,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = if (isFuture)
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                            else
+                                MaterialTheme.colorScheme.onSurface
+                        )
                     }
                 }
             }
@@ -378,7 +412,9 @@ private fun YearTab(
 
     val byMonth = remember(txs, selectedYear) {
         (1..12).map { m ->
-            val monthTx = txs.filter { it.date.year == selectedYear && it.date.monthValue == m }
+            val monthTx = txs.filter {
+                it.date.year == selectedYear && it.date.monthValue == m
+            }
             MonthRow(month = m, totals = monthTx.computeTotals())
         }
     }
@@ -450,13 +486,8 @@ private fun YearTab(
                         .fillMaxWidth()
                         .padding(12.dp)
                 ) {
-                    // Заголовок месяца отдельной строкой
                     Text(monthName(row.month), fontWeight = FontWeight.SemiBold)
-
-                    // Отступ между заголовком и суммами
                     Spacer(Modifier.height(8.dp))
-
-                    // Блок сумм прижат вправо
                     Column(horizontalAlignment = Alignment.End) {
                         MoneyLineLabel("Доход:", TxType.INCOME, row.totals.income)
                         MoneyLineLabel("Расход:", TxType.EXPENSE, row.totals.expense)
@@ -489,6 +520,42 @@ private fun TotalsBlock(t: Totals) {
     }
 }
 
+/**
+ * Строка суммы в списке месячных транзакций (MonthTab).
+ * Доход с плюсом, расход с минусом, будущие — серым.
+ */
+@Composable
+private fun MonthTxMoneyLine(
+    type: TxType,
+    amount: Double,
+    isFuture: Boolean,
+) {
+    val core = moneyFormatPlain(amount)
+    val sign = if (type == TxType.INCOME) "+" else "-"
+    val text = sign + core
+
+    val baseColor = if (type == TxType.INCOME) {
+        Color(0xFF2E7D32)
+    } else {
+        Color(0xFFC62828)
+    }
+
+    val color = if (isFuture) {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    } else {
+        baseColor
+    }
+
+    Text(
+        text = text,
+        color = color,
+        fontWeight = FontWeight.Medium
+    )
+}
+
+/**
+ * Используется в TotalsBlock / YearTab, там уже нет будущих транзакций.
+ */
 @Composable
 private fun MoneyLine(type: TxType, amount: Double) {
     val text = moneyFormat(amount, type)

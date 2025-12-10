@@ -181,6 +181,7 @@ fun PropertyTransactionsScreen(
     if (currentEditing != null) {
         EditTransactionDialog(
             initial = currentEditing!!,
+            isNew = isNew,
             onSave = { isIncome, amount, date, note ->
                 if (isNew) {
                     vm.addTransaction(
@@ -221,7 +222,33 @@ private fun TransactionRow(
     val formatter = remember { DateTimeFormatter.ofPattern("dd.MM.yyyy") }
 
     val isIncome = transaction.type == TxType.INCOME
-    val amountColor = if (isIncome) Color(0xFF2E7D32) else Color(0xFFC62828)
+
+    // Сегодня и флаг "будущая транзакция"
+    val today = LocalDate.now()
+    val isFuture = transaction.date.isAfter(today)
+
+    // Базовые цвета для дохода / расхода
+    val baseAmountColor = if (isIncome) Color(0xFF2E7D32) else Color(0xFFC62828)
+
+    // Если транзакция в будущем — всё делаем серым/приглушённым
+    val amountColor = if (isFuture) {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    } else {
+        baseAmountColor
+    }
+
+    val dateColor = if (isFuture) {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    val noteColor = if (isFuture) {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
     val sign = if (isIncome) "+" else "-"
     val amountText = remember(transaction.amount, transaction.type) {
         sign + String.format(Locale("ru", "RU"), "%.2f", transaction.amount)
@@ -256,7 +283,7 @@ private fun TransactionRow(
                 Text(
                     text = transaction.date.format(formatter),
                     style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                    color = dateColor
                 )
             }
             if (!transaction.note.isNullOrBlank()) {
@@ -264,7 +291,8 @@ private fun TransactionRow(
                     text = transaction.note!!,
                     style = MaterialTheme.typography.bodyMedium,
                     maxLines = 2,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
+                    color = noteColor
                 )
             }
         }

@@ -4,6 +4,7 @@ package com.example.my_project.ui.components
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -28,6 +29,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.my_project.data.model.Transaction
 import com.example.my_project.data.model.TxType
@@ -41,22 +43,23 @@ import java.util.Locale
 @Composable
 fun EditTransactionDialog(
     initial: Transaction,
+    isNew: Boolean,
     onSave: (isIncome: Boolean, amount: Double, date: LocalDate, note: String?) -> Unit,
     onDelete: () -> Unit,
     onDismiss: () -> Unit
 ) {
     var isIncome by remember { mutableStateOf(initial.type == TxType.INCOME) }
 
-    // ⬇ сумма: если 0.0 — поле пустое, иначе форматируем
+    // Сумма как "сырая" строка, без автоформатирования при вводе
     var amountText by remember {
         mutableStateOf(
-            if (initial.amount == 0.0) "" else formatMoneyForField(initial.amount)
+            if (initial.amount == 0.0) "" else formatAmountForEdit(initial.amount)
         )
     }
 
     var note by remember { mutableStateOf(initial.note ?: "") }
 
-    // ---- ДАТА (оставляем логику как в рабочей версии) ----
+    // ---- ДАТА ----
     var date by remember { mutableStateOf(initial.date) }
     val dateLabelFmt = remember { DateTimeFormatter.ofPattern("dd.MM.yyyy") }
     var dateDialogOpen by remember { mutableStateOf(false) }
@@ -66,10 +69,10 @@ fun EditTransactionDialog(
     }
     val dateState = rememberDatePickerState(initialSelectedDateMillis = initialMillis)
 
-    // Синхронизируем selectedDateMillis при открытии диалога
     LaunchedEffect(dateDialogOpen) {
         if (dateDialogOpen) {
-            dateState.selectedDateMillis = date.atStartOfDay(ZoneId.systemDefault())
+            dateState.selectedDateMillis = date
+                .atStartOfDay(ZoneId.systemDefault())
                 .toInstant()
                 .toEpochMilli()
         }
@@ -78,21 +81,36 @@ fun EditTransactionDialog(
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
-            TextButton(onClick = {
-                val normalized = amountText
-                    .replace(" ", "")
-                    .replace("\u00A0", "") // если будут неразрывные пробелы
-                    .replace(",", ".")
-                    .trim()
-                val amount = normalized.toDoubleOrNull() ?: return@TextButton
-                onSave(isIncome, amount, date, note.ifBlank { null })
-            }) {
+            TextButton(
+                onClick = {
+                    val normalized = amountText
+                        .replace(" ", "")
+                        .replace("\u00A0", "")
+                        .replace(",", ".")
+                        .trim()
+
+                    val amount = normalized.toDoubleOrNull()
+                    if (amount == null) {
+                        // Можно позже добавить подсветку ошибки, пока просто не закрываем
+                        return@TextButton
+                    }
+
+                    onSave(
+                        isIncome,
+                        amount,
+                        date,
+                        note.ifBlank { null }
+                    )
+                }
+            ) {
                 Text("Сохранить")
             }
         },
         dismissButton = {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                TextButton(onClick = onDismiss) { Text("Отмена") }
+                TextButton(onClick = onDismiss) {
+                    Text("Отмена")
+                }
                 TextButton(
                     onClick = onDelete,
                     colors = ButtonDefaults.textButtonColors(
@@ -104,58 +122,86 @@ fun EditTransactionDialog(
             }
         },
         title = {
-            Text("Редактировать транзакцию")
+            androidx.compose.foundation.layout.Box(
+                modifier = Modifier.fillMaxWidth(),
+                contentAlignment = androidx.compose.ui.Alignment.Center
+            ) {
+                Text(
+                    text = if (isNew) "Добавление транзакции" else "Редактирование транзакции",
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
         },
         text = {
             Column(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
+                // ---- ТИП: ДОХОД / РАСХОД В ОДНУ СТРОКУ, СИММЕТРИЧНО ----
                 Row(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     FilterChip(
                         selected = isIncome,
                         onClick = { isIncome = true },
-                        label = { Text("Доход") }
+                        label = {
+                            Box(Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = "Доход",
+                                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
                     )
                     FilterChip(
                         selected = !isIncome,
                         onClick = { isIncome = false },
-                        label = { Text("Расход") }
+                        label = {
+                            Box(Modifier.fillMaxWidth()) {
+                                Text(
+                                    text = "Расход",
+                                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
                     )
                 }
 
-                // ---- СУММА: автоформат, пробелы, 2 знака ----
+                // ---- СУММА ----
                 OutlinedTextField(
                     value = amountText,
                     onValueChange = { newValue ->
-                        val cleaned = newValue
-                            .filter { ch -> ch.isDigit() || ch == ',' || ch == '.' }
-
-                        if (cleaned.isBlank()) {
-                            amountText = ""
-                        } else {
-                            val normalized = cleaned
-                                .replace(" ", "")
-                                .replace("\u00A0", "")
-                                .replace(",", ".")
-                            val parsed = normalized.toDoubleOrNull()
-                            amountText = if (parsed != null) {
-                                formatMoneyForField(parsed)
-                            } else {
-                                cleaned
+                        var separatorSeen = false
+                        val filtered = buildString {
+                            for (ch in newValue) {
+                                when {
+                                    ch.isDigit() -> append(ch)
+                                    (ch == ',' || ch == '.') && !separatorSeen -> {
+                                        append(ch)
+                                        separatorSeen = true
+                                    }
+                                    else -> Unit
+                                }
                             }
                         }
+                        amountText = filtered
                     },
                     label = { Text("Сумма") },
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                // ---- ДАТА: как было, через Box + disabled поле ----
-                androidx.compose.foundation.layout.Box(
+                // ---- ДАТА ----
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .clickable { dateDialogOpen = true }
@@ -165,12 +211,12 @@ fun EditTransactionDialog(
                         onValueChange = {},
                         label = { Text("Дата") },
                         readOnly = true,
-                        enabled = false,   // да, оно серое, зато 100% работает
+                        enabled = false,
                         modifier = Modifier.fillMaxWidth()
                     )
                 }
 
-                // Комментарий
+                // ---- КОММЕНТАРИЙ ----
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
@@ -187,16 +233,23 @@ fun EditTransactionDialog(
         DatePickerDialog(
             onDismissRequest = { dateDialogOpen = false },
             confirmButton = {
-                TextButton(onClick = {
-                    val millis = dateState.selectedDateMillis ?: System.currentTimeMillis()
-                    date = Instant.ofEpochMilli(millis)
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDate()
-                    dateDialogOpen = false
-                }) { Text("OK") }
+                TextButton(
+                    onClick = {
+                        val millis = dateState.selectedDateMillis ?: System.currentTimeMillis()
+                        val selectedDate = Instant.ofEpochMilli(millis)
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDate()
+                        date = selectedDate
+                        dateDialogOpen = false
+                    }
+                ) {
+                    Text("Ок")
+                }
             },
             dismissButton = {
-                TextButton(onClick = { dateDialogOpen = false }) { Text("Отмена") }
+                TextButton(onClick = { dateDialogOpen = false }) {
+                    Text("Отмена")
+                }
             }
         ) {
             DatePicker(state = dateState)
@@ -204,11 +257,18 @@ fun EditTransactionDialog(
     }
 }
 
-private fun formatMoneyForField(value: Double): String {
-    val nf = NumberFormat.getNumberInstance(Locale("ru", "RU")).apply {
-        minimumFractionDigits = 2
+/**
+ * Преобразуем Double в удобную строку для редактирования:
+ * - без разделителей тысяч
+ * - максимум 2 знака после запятой
+ * - разделитель десятых — запятая (под RU-привычку)
+ */
+private fun formatAmountForEdit(value: Double): String {
+    val nf = NumberFormat.getNumberInstance(Locale.US).apply {
+        minimumFractionDigits = 0
         maximumFractionDigits = 2
-        isGroupingUsed = true   // пробелы между тысячами
+        isGroupingUsed = false
     }
-    return nf.format(value)
+    val raw = nf.format(value) // "1234.5" или "1234.56"
+    return raw.replace('.', ',')
 }

@@ -70,11 +70,14 @@ fun PropertyDetailsScreen(
     val property = properties.firstOrNull { it.id == propertyId }
 
     val allTxs by vm.transactions.collectAsState()
-    val year = remember { LocalDate.now().year }
+    val today = remember { LocalDate.now() }
+    val year = today.year
 
+    // В годовой карточке объекта учитываем только транзакции,
+    // дата которых уже наступила (date <= сегодня)
     val yearTransactions = allTxs
         .filter { it.propertyId == propertyId }
-        .filter { it.date.year == year }
+        .filter { it.date.year == year && !it.date.isAfter(today) }
 
     val income = yearTransactions.filter { it.type == TxType.INCOME }.sumOf { it.amount }
     val expense = yearTransactions.filter { it.type == TxType.EXPENSE }.sumOf { it.amount }

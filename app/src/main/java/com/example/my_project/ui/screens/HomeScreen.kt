@@ -6,8 +6,8 @@ import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
-import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,9 +19,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Apartment
+import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -34,10 +37,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.my_project.data.model.TxType
@@ -60,8 +65,11 @@ fun HomeScreen(
     val monthName = monthName(now.monthValue)
     val year = now.year
 
+    // ⚙️ ЛОГИКА: будущие даты не учитываем (как мы зафиксировали)
     val monthTransactions = transactions.filter {
-        it.date.year == year && it.date.monthValue == now.monthValue
+        it.date.year == year &&
+                it.date.monthValue == now.monthValue &&
+                !it.date.isAfter(now)
     }
 
     val income = monthTransactions
@@ -94,6 +102,18 @@ fun HomeScreen(
         ),
         label = "card_alpha"
     )
+    // Мягкая анимация для «города» внизу
+    val citylinePhase by infiniteTransition.animateFloat(
+        initialValue = 0.9f,
+        targetValue = 1.1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2200, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "cityline_phase"
+    )
+
+    val scrollState = rememberScrollState()
 
     Surface(
         modifier = Modifier.fillMaxSize()
@@ -113,7 +133,8 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 24.dp),
+                    .padding(horizontal = 16.dp, vertical = 24.dp)
+                    .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
 
@@ -139,10 +160,15 @@ fun HomeScreen(
                     )
                 }
 
-                // Мини-виджет: итоги за текущий месяц
+                // Мини-виджет: итоги за текущий месяц (подсветка активного месяца рамкой)
                 Card(
                     modifier = Modifier
-                        .fillMaxWidth(),
+                        .fillMaxWidth()
+                        .border(
+                            width = 1.dp,
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
+                            shape = RoundedCornerShape(20.dp)
+                        ),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
@@ -218,11 +244,6 @@ fun HomeScreen(
                                     color = Color(0xFFC62828),
                                     fontWeight = FontWeight.SemiBold
                                 )
-//                                Text(
-//                                    text = moneyFormatPlain(expense),
-//                                    color = Color(0xFFC62828),
-//                                    fontWeight = FontWeight.SemiBold
-//                                )
                             }
 
                             Row(
@@ -232,18 +253,9 @@ fun HomeScreen(
                                 Text("Чистый результат")
                                 Text(
                                     text = moneyFormatPlain(delta),
-                                    color = MaterialTheme.colorScheme.onSurface, // чёрный/основной текстовый
+                                    color = MaterialTheme.colorScheme.onSurface,
                                     fontWeight = FontWeight.SemiBold
                                 )
-//                                Text(
-//                                    text = moneyFormatPlain(delta),
-//                                    color = when {
-//                                        delta > 0 -> Color(0xFF2E7D32)
-//                                        delta < 0 -> Color(0xFFC62828)
-//                                        else -> MaterialTheme.colorScheme.onSurface
-//                                    },
-//                                    fontWeight = FontWeight.SemiBold
-//                                )
                             }
                         }
                     }
@@ -271,14 +283,31 @@ fun HomeScreen(
                         tint = MaterialTheme.colorScheme.primary,
                         onClick = onOpenStats
                     )
-//                    HomeActionCard(
-//                        title = "Статистика",
-//                        subtitle = "Общая картина: помесячно, по объектам и по типам транзакций",
-//                        icon = Icons.Filled.PieChart,
-//                        tint = MaterialTheme.colorScheme.secondary,
-//                        onClick = onOpenStats
-//                    )
                 }
+
+                Spacer(Modifier.height(8.dp))
+
+                // Декоративная линия «города» с огоньками и параллаксом
+                BottomCityline(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(72.dp),
+                    phase = citylinePhase,
+                    scroll = scrollState.value
+                )
+
+                // Подпись под «городом»
+                Spacer(Modifier.height(6.dp))
+                Text(
+                    text = "Управление недвижимостью",
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 4.dp),
+                    textAlign = TextAlign.Center,
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
+                    fontWeight = FontWeight.SemiBold
+                )
             }
         }
     }
@@ -340,6 +369,76 @@ private fun HomeActionCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BottomCityline(
+    modifier: Modifier = Modifier,
+    phase: Float,
+    scroll: Int
+) {
+    // Базовые высоты «домиков»
+    val baseHeights = listOf(18, 32, 26, 40, 24, 36, 22)
+
+    Row(
+        modifier = modifier
+            .graphicsLayer(
+                // лёгкий параллакс: чем больше скролл, тем чуть выше/ниже «город»
+                translationY = -(scroll * 0.05f)
+            ),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        baseHeights.forEachIndexed { index, h ->
+            val animatedFactor = 0.9f + (0.1f * phase)
+            val height = (h * animatedFactor).dp
+
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .height(height)
+                    .clip(RoundedCornerShape(topStart = 8.dp, topEnd = 8.dp))
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.40f),
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.08f)
+                            )
+                        )
+                    )
+            ) {
+                // «Огоньки» / окошки
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 4.dp, vertical = 4.dp),
+                    verticalArrangement = Arrangement.SpaceEvenly,
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    val rows = if (h <= 22) 1 else 2
+                    repeat(rows) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            repeat(2) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(width = 6.dp, height = 8.dp)
+                                        .clip(RoundedCornerShape(2.dp))
+                                        .background(
+                                            Color(0xFFFFF9C4).copy(
+                                                alpha = if ((index + it + rows) % 2 == 0) 0.85f else 0.35f
+                                            )
+                                        )
+                                )
+                            }
+                        }
+                    }
+                }
             }
         }
     }

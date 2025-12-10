@@ -34,9 +34,9 @@ import com.example.my_project.ui.RealEstateViewModel
 import com.example.my_project.ui.util.DateFmtDMY
 import com.example.my_project.ui.util.Totals
 import com.example.my_project.ui.util.computeTotals
-import com.example.my_project.ui.util.moneyFormat
 import com.example.my_project.ui.util.moneyFormatPlain
 import com.example.my_project.ui.util.monthName
+import java.time.LocalDate
 
 @Composable
 fun StatsMonthScreen(
@@ -52,6 +52,7 @@ fun StatsMonthScreen(
                 (propertyId == null || t.propertyId == propertyId)
     }.sortedByDescending { it.date }
 
+    // computeTotals() уже отбрасывает будущие транзакции
     val totals = txs.computeTotals()
 
     Scaffold(
@@ -99,34 +100,83 @@ private fun TotalsRow(t: Totals) {
 
 @Composable
 private fun TxCard(t: Transaction) {
+    val today = LocalDate.now()
+    val isFuture = t.date.isAfter(today)
+
+    val headerColor = if (isFuture) {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
+    val dateColor = if (isFuture) {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
+
+    val noteColor = if (isFuture) {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    } else {
+        MaterialTheme.colorScheme.onSurface
+    }
+
     ElevatedCard(Modifier.fillMaxWidth()) {
         Column(Modifier.padding(12.dp)) {
             Text(
-                if (t.type == TxType.INCOME) "Доход" else "Расход",
-                fontWeight = FontWeight.SemiBold
+                text = if (t.type == TxType.INCOME) "Доход" else "Расход",
+                fontWeight = FontWeight.SemiBold,
+                color = headerColor
             )
-            MoneyLine(type = t.type, amount = t.amount)
-            Text(t.date.format(DateFmtDMY), style = MaterialTheme.typography.bodySmall)
+            MoneyLine(type = t.type, amount = t.amount, isFuture = isFuture)
+            Text(
+                text = t.date.format(DateFmtDMY),
+                style = MaterialTheme.typography.bodySmall,
+                color = dateColor
+            )
             if (!t.note.isNullOrBlank()) {
-                Text(t.note!!, style = MaterialTheme.typography.bodySmall)
+                Text(
+                    text = t.note!!,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = noteColor
+                )
             }
         }
     }
 }
 
-/* Локальные UI-хелперы для денег — такие же, как в StatsScreen */
-
+/**
+ * Строка суммы для конкретной транзакции в списке месяца.
+ * Доход всегда с плюсом, расход — с минусом.
+ * Будущие транзакции показываются серым цветом.
+ */
 @Composable
-private fun MoneyLine(type: TxType, amount: Double) {
-    val text = moneyFormat(amount, type)
-    val color = if (type == TxType.INCOME) Color(0xFF2E7D32) else Color(0xFFC62828)
+private fun MoneyLine(type: TxType, amount: Double, isFuture: Boolean) {
+    val core = moneyFormatPlain(amount)
+    val sign = if (type == TxType.INCOME) "+" else "-"
+    val text = sign + core
+
+    val baseColor = if (type == TxType.INCOME) Color(0xFF2E7D32) else Color(0xFFC62828)
+    val color = if (isFuture) {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+    } else {
+        baseColor
+    }
+
     Text(text, color = color, fontWeight = FontWeight.Medium)
 }
 
+/**
+ * Строки "Доход:" / "Расход:" в блоке итогов.
+ * Доход с плюсом, расход с минусом.
+ */
 @Composable
 private fun MoneyLineLabel(label: String, type: TxType, amount: Double) {
-    val text = moneyFormat(amount, type)
+    val core = moneyFormatPlain(amount)
+    val sign = if (type == TxType.INCOME) "+" else "-"
+    val text = sign + core
     val color = if (type == TxType.INCOME) Color(0xFF2E7D32) else Color(0xFFC62828)
+
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label)
         Text(text, color = color, fontWeight = FontWeight.Medium)
