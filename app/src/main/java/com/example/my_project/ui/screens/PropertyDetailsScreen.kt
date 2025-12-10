@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Insights
@@ -90,16 +91,16 @@ fun PropertyDetailsScreen(
             onDismissRequest = { featureStubMessage = null },
             icon = {
                 Icon(
-                    imageVector = Icons.Outlined.Apartment,
-                    contentDescription = null,
-                    modifier = Modifier.size(96.dp)
+                    Icons.Filled.Build,
+                    contentDescription = "В разработке",
+                    modifier = Modifier.size(72.dp)
                 )
             },
-            title = { Text("Котик грустит 😿") },
-            text = { Text(featureStubMessage ?: "") },
+            title = { Text("Упс...") },
+            text = { Text( "Данный функционал в разработке") },
             confirmButton = {
                 TextButton(onClick = { featureStubMessage = null }) {
-                    Text("Котик, не грусти!")
+                    Text("ок")
                 }
             }
         )

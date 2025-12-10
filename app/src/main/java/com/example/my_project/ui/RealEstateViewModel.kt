@@ -11,32 +11,63 @@ import com.example.my_project.data.model.PropertyPhoto
 import com.example.my_project.data.model.Transaction
 import com.example.my_project.data.model.TxType
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import javax.inject.Inject
 
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class RealEstateViewModel @Inject constructor(
     private val repo: RealEstateRepository,
     session: UserSession
 ) : ViewModel() {
 
+    /**
+     * Берём userId из UserSession.userIdFlow (Flow<String?>)
+     * и превращаем в StateFlow, чтобы:
+     * - иметь .value для быстрых операций,
+     * - использовать в других StateFlow.
+     */
     private val userIdFlow: StateFlow<String?> =
-        session.userIdFlow.stateIn(viewModelScope, SharingStarted.Eagerly, null)
+        session.userIdFlow.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(5_000),
+            initialValue = null
+        )
 
+    /** Список объектов текущего пользователя. */
     val properties: StateFlow<List<Property>> =
-        userIdFlow.flatMapLatest { uid ->
-            if (uid == null) flowOf(emptyList()) else repo.properties(uid)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        userIdFlow
+            .flatMapLatest { uid ->
+                if (uid == null) flowOf(emptyList()) else repo.properties(uid)
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyList()
+            )
 
+    /** Все транзакции текущего пользователя. */
     val transactions: StateFlow<List<Transaction>> =
-        userIdFlow.flatMapLatest { uid ->
-            if (uid == null) flowOf(emptyList()) else repo.transactions(uid)
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+        userIdFlow
+            .flatMapLatest { uid ->
+                if (uid == null) flowOf(emptyList()) else repo.transactions(uid)
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5_000),
+                initialValue = emptyList()
+            )
 
-    // ---- Property ----
+    // --------------------------------------------------------------------
+    // Property
+    // --------------------------------------------------------------------
+
     fun addProperty(
         name: String,
         address: String?,
@@ -50,6 +81,7 @@ class RealEstateViewModel @Inject constructor(
             repo.addProperty(
                 uid,
                 Property(
+                    id = "",
                     name = name,
                     address = address,
                     monthlyRent = monthlyRent,
@@ -76,32 +108,60 @@ class RealEstateViewModel @Inject constructor(
     ) {
         val uid = userIdFlow.value ?: return
         viewModelScope.launch {
-            repo.updateProperty(uid, id, name, address, monthlyRent, leaseFrom, leaseTo)
+            repo.updateProperty(
+                userId = uid,
+                id = id,
+                name = name,
+                address = address,
+                monthlyRent = monthlyRent,
+                leaseFrom = leaseFrom,
+                leaseTo = leaseTo
+            )
         }
     }
 
     fun deleteProperty(id: String) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch { repo.deletePropertyWithRelations(uid, id) }
+        viewModelScope.launch {
+            repo.deletePropertyWithRelations(uid, id)
+        }
     }
 
     fun setCover(propertyId: String, coverUri: String?) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch { repo.setPropertyCover(uid, propertyId, coverUri) }
+        viewModelScope.launch {
+            repo.setPropertyCover(uid, propertyId, coverUri)
+        }
     }
 
-    // ---- Property Details ----
+    // --------------------------------------------------------------------
+    // Property details
+    // --------------------------------------------------------------------
+
     fun propertyDetails(propertyId: String): Flow<PropertyDetails?> =
         userIdFlow.flatMapLatest { uid ->
             if (uid == null) flowOf(null) else repo.propertyDetails(uid, propertyId)
         }
 
-    fun savePropertyDetails(propertyId: String, description: String?, areaSqm: String?) {
+    fun savePropertyDetails(
+        propertyId: String,
+        description: String?,
+        areaSqm: String?
+    ) {
         val uid = userIdFlow.value ?: return
         viewModelScope.launch {
-            repo.upsertPropertyDetails(uid, propertyId, description, areaSqm)
+            repo.upsertPropertyDetails(
+                userId = uid,
+                propertyId = propertyId,
+                description = description,
+                areaSqm = areaSqm
+            )
         }
     }
+
+    // --------------------------------------------------------------------
+    // Property photos
+    // --------------------------------------------------------------------
 
     fun propertyPhotos(propertyId: String): Flow<List<PropertyPhoto>> =
         userIdFlow.flatMapLatest { uid ->
@@ -110,15 +170,37 @@ class RealEstateViewModel @Inject constructor(
 
     fun addPropertyPhotos(propertyId: String, uris: List<String>) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch { repo.addPropertyPhotos(uid, propertyId, uris) }
+        viewModelScope.launch {
+            repo.addPropertyPhotos(uid, propertyId, uris)
+        }
     }
 
     fun deletePropertyPhoto(photoId: String) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch { repo.deletePropertyPhoto(uid, photoId) }
+        viewModelScope.launch {
+            repo.deletePropertyPhoto(uid, photoId)
+        }
     }
 
-    // ---- Transactions ----
+    /**
+     * Сохранённая перестановка фото.
+     * Вызывается из PropertyInfoScreen, когда пользователь двигает фото стрелками.
+     */
+    fun reorderPropertyPhotos(propertyId: String, orderedIds: List<String>) {
+        val uid = userIdFlow.value ?: return
+        viewModelScope.launch {
+            repo.reorderPropertyPhotos(
+                userId = uid,
+                propertyId = propertyId,
+                orderedIds = orderedIds
+            )
+        }
+    }
+
+    // --------------------------------------------------------------------
+    // Transactions
+    // --------------------------------------------------------------------
+
     fun addTransaction(
         propertyId: String,
         isIncome: Boolean,
@@ -128,7 +210,14 @@ class RealEstateViewModel @Inject constructor(
     ) {
         val uid = userIdFlow.value ?: return
         viewModelScope.launch {
-            repo.addTransaction(uid, propertyId, if (isIncome) TxType.INCOME else TxType.EXPENSE, amount, date, note)
+            repo.addTransaction(
+                userId = uid,
+                propertyId = propertyId,
+                type = if (isIncome) TxType.INCOME else TxType.EXPENSE,
+                amount = amount,
+                date = date,
+                note = note
+            )
         }
     }
 
@@ -141,28 +230,55 @@ class RealEstateViewModel @Inject constructor(
     ) {
         val uid = userIdFlow.value ?: return
         viewModelScope.launch {
-            repo.updateTransaction(uid, id, if (isIncome) TxType.INCOME else TxType.EXPENSE, amount, date, note)
+            repo.updateTransaction(
+                userId = uid,
+                id = id,
+                type = if (isIncome) TxType.INCOME else TxType.EXPENSE,
+                amount = amount,
+                date = date,
+                note = note
+            )
         }
     }
 
     fun deleteTransaction(id: String) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch { repo.deleteTransaction(uid, id) }
+        viewModelScope.launch {
+            repo.deleteTransaction(uid, id)
+        }
     }
 
-    // ---- Attachments (documents) ----
+    // --------------------------------------------------------------------
+    // Attachments (документы)
+    // --------------------------------------------------------------------
+
     fun attachments(propertyId: String): Flow<List<Attachment>> =
         userIdFlow.flatMapLatest { uid ->
             if (uid == null) flowOf(emptyList()) else repo.attachments(uid, propertyId)
         }
 
-    fun addAttachment(propertyId: String, name: String?, mime: String?, uri: String) {
+    fun addAttachment(
+        propertyId: String,
+        name: String?,
+        mime: String?,
+        uri: String
+    ) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch { repo.addAttachment(uid, propertyId, name, mime, uri) }
+        viewModelScope.launch {
+            repo.addAttachment(
+                userId = uid,
+                propertyId = propertyId,
+                name = name,
+                mime = mime,
+                uri = uri
+            )
+        }
     }
 
     fun deleteAttachment(id: String) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch { repo.deleteAttachment(uid, id) }
+        viewModelScope.launch {
+            repo.deleteAttachment(uid, id)
+        }
     }
 }

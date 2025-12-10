@@ -60,6 +60,9 @@ interface PropertyPhotoDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(list: List<PropertyPhotoEntity>)
 
+    @Query("UPDATE property_photos SET createdAt = :createdAt WHERE userId = :userId AND id = :id")
+    suspend fun updateCreatedAt(userId: String, id: String, createdAt: Long)
+
     @Query("DELETE FROM property_photos WHERE userId = :userId AND id = :id")
     suspend fun delete(userId: String, id: String)
 

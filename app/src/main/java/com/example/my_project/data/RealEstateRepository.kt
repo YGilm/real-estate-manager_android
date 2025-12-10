@@ -42,6 +42,7 @@ interface RealEstateRepository {
     fun propertyPhotos(userId: String, propertyId: String): Flow<List<PropertyPhoto>>
     suspend fun addPropertyPhotos(userId: String, propertyId: String, uris: List<String>)
     suspend fun deletePropertyPhoto(userId: String, photoId: String)
+    suspend fun reorderPropertyPhotos(userId: String, propertyId: String, orderedIds: List<String>)
 
     // ---------- Transactions ----------
     fun transactions(userId: String): Flow<List<Transaction>>

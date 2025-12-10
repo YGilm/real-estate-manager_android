@@ -18,6 +18,7 @@ import com.example.my_project.data.model.Transaction
 import com.example.my_project.data.model.TxType
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
@@ -25,61 +26,36 @@ import java.util.UUID
 import javax.inject.Inject
 import javax.inject.Singleton
 
+/**
+ * Реализация [RealEstateRepository] поверх Room-DAO.
+ *
+ * Все тяжёлые операции выполняются на Dispatchers.IO.
+ */
 @Singleton
 class RoomRealEstateRepository @Inject constructor(
     private val propertyDao: PropertyDao,
-    private val transactionDao: TransactionDao,
-    private val attachmentDao: AttachmentDao,
     private val propertyDetailsDao: PropertyDetailsDao,
     private val propertyPhotoDao: PropertyPhotoDao,
+    private val transactionDao: TransactionDao,
+    private val attachmentDao: AttachmentDao,
 ) : RealEstateRepository {
 
     // ---------- Properties ----------
+
     override fun properties(userId: String): Flow<List<Property>> =
         propertyDao.list(userId).map { list ->
-            list.map {
-                Property(
-                    id = it.id,
-                    name = it.name,
-                    address = it.address,
-                    monthlyRent = it.monthlyRent,
-                    coverUri = it.coverUri,
-                    leaseFrom = it.leaseFrom,
-                    leaseTo = it.leaseTo
-                )
-            }
+            list.map { it.toModel() }
         }
 
     override suspend fun addProperty(userId: String, property: Property) =
         withContext(Dispatchers.IO) {
-            val id = if (property.id.isBlank()) UUID.randomUUID().toString() else property.id
-            propertyDao.upsert(
-                PropertyEntity(
-                    id = id,
-                    userId = userId,
-                    name = property.name,
-                    address = property.address,
-                    monthlyRent = property.monthlyRent,
-                    coverUri = property.coverUri,
-                    leaseFrom = property.leaseFrom,
-                    leaseTo = property.leaseTo
-                )
-            )
+            val entity = property.toEntity(userId)
+            propertyDao.upsert(entity)
         }
 
     override suspend fun getProperty(userId: String, id: String): Property? =
         withContext(Dispatchers.IO) {
-            propertyDao.getById(userId, id)?.let {
-                Property(
-                    id = it.id,
-                    name = it.name,
-                    address = it.address,
-                    monthlyRent = it.monthlyRent,
-                    coverUri = it.coverUri,
-                    leaseFrom = it.leaseFrom,
-                    leaseTo = it.leaseTo
-                )
-            }
+            propertyDao.getById(userId, id)?.toModel()
         }
 
     override suspend fun updateProperty(
@@ -89,115 +65,144 @@ class RoomRealEstateRepository @Inject constructor(
         address: String?,
         monthlyRent: Double?,
         leaseFrom: String?,
-        leaseTo: String?
+        leaseTo: String?,
     ) = withContext(Dispatchers.IO) {
-        val existing = propertyDao.getById(userId, id) ?: return@withContext
-        propertyDao.upsert(
-            existing.copy(
-                name = name,
-                address = address,
-                monthlyRent = monthlyRent,
-                leaseFrom = leaseFrom,
-                leaseTo = leaseTo
-            )
+        val current = propertyDao.getById(userId, id) ?: return@withContext
+        val updated = current.copy(
+            name = name,
+            address = address,
+            monthlyRent = monthlyRent,
+            leaseFrom = leaseFrom,
+            leaseTo = leaseTo
         )
+        propertyDao.upsert(updated)
     }
 
     override suspend fun deletePropertyWithRelations(userId: String, id: String) =
         withContext(Dispatchers.IO) {
-            // сначала дочерние данные
-            attachmentDao.deleteForProperty(userId, id)
+            // сначала дочерние сущности, затем сам объект
             transactionDao.deleteForProperty(userId, id)
-            propertyPhotoDao.deleteForProperty(userId, id)
+            attachmentDao.deleteForProperty(userId, id)
             propertyDetailsDao.deleteForProperty(userId, id)
-
-            // затем сам объект
+            propertyPhotoDao.deleteForProperty(userId, id)
             propertyDao.delete(userId, id)
         }
 
-    override suspend fun setPropertyCover(userId: String, propertyId: String, coverUri: String?) =
-        withContext(Dispatchers.IO) {
-            propertyDao.updateCover(userId, propertyId, coverUri)
-        }
+    override suspend fun setPropertyCover(
+        userId: String,
+        propertyId: String,
+        coverUri: String?,
+    ) = withContext(Dispatchers.IO) {
+        propertyDao.updateCover(userId, propertyId, coverUri)
+    }
 
     // ---------- Property details ----------
+
     override fun propertyDetails(userId: String, propertyId: String): Flow<PropertyDetails?> =
-        propertyDetailsDao.observe(userId, propertyId).map { e ->
-            e?.let { PropertyDetails(propertyId = it.propertyId, description = it.description, areaSqm = it.areaSqm) }
+        propertyDetailsDao.observe(userId, propertyId).map { entity ->
+            entity?.toModel()
         }
 
     override suspend fun upsertPropertyDetails(
         userId: String,
         propertyId: String,
         description: String?,
-        areaSqm: String?
+        areaSqm: String?,
     ) = withContext(Dispatchers.IO) {
-        propertyDetailsDao.upsert(
-            PropertyDetailsEntity(
-                userId = userId,
-                propertyId = propertyId,
-                description = description,
-                areaSqm = areaSqm,
-                updatedAt = System.currentTimeMillis()
-            )
+        val entity = PropertyDetailsEntity(
+            userId = userId,
+            propertyId = propertyId,
+            description = description,
+            areaSqm = areaSqm,
+            updatedAt = System.currentTimeMillis()
         )
+        propertyDetailsDao.upsert(entity)
     }
 
     // ---------- Property photos ----------
+
     override fun propertyPhotos(userId: String, propertyId: String): Flow<List<PropertyPhoto>> =
         propertyPhotoDao.observeForProperty(userId, propertyId).map { list ->
-            list.map { PropertyPhoto(id = it.id, propertyId = it.propertyId, uri = it.uri) }
+            list.map { it.toModel() }
         }
 
-    override suspend fun addPropertyPhotos(userId: String, propertyId: String, uris: List<String>) =
-        withContext(Dispatchers.IO) {
-            if (uris.isEmpty()) return@withContext
-            val now = System.currentTimeMillis()
-            val entities = uris.map { uri ->
-                PropertyPhotoEntity(
-                    id = UUID.randomUUID().toString(),
-                    userId = userId,
-                    propertyId = propertyId,
-                    uri = uri,
-                    createdAt = now
-                )
-            }
-            propertyPhotoDao.upsertAll(entities)
+    override suspend fun addPropertyPhotos(
+        userId: String,
+        propertyId: String,
+        uris: List<String>,
+    ) = withContext(Dispatchers.IO) {
+        if (uris.isEmpty()) return@withContext
+
+        val baseTime = System.currentTimeMillis()
+        val entities = uris.mapIndexed { index, uri ->
+            PropertyPhotoEntity(
+                id = UUID.randomUUID().toString(),
+                userId = userId,
+                propertyId = propertyId,
+                uri = uri,
+                // более новые фото — больше createdAt, они будут выше
+                createdAt = baseTime + index
+            )
         }
+        propertyPhotoDao.upsertAll(entities)
+    }
 
     override suspend fun deletePropertyPhoto(userId: String, photoId: String) =
         withContext(Dispatchers.IO) {
             propertyPhotoDao.delete(userId, photoId)
         }
 
-    // ---------- Transactions ----------
-    override fun transactions(userId: String): Flow<List<Transaction>> =
-        transactionDao.listAll(userId).map { list ->
-            list.map { e ->
-                Transaction(
-                    id = e.id,
-                    propertyId = e.propertyId,
-                    type = if (e.isIncome) TxType.INCOME else TxType.EXPENSE,
-                    amount = e.amount,
-                    date = LocalDate.parse(e.dateIso),
-                    note = e.note
-                )
-            }
+    /**
+     * Перестановка фото.
+     *
+     * Используем поле createdAt как «вес» для сортировки (ORDER BY createdAt DESC),
+     * поэтому просто переназначаем createdAt в новом порядке.
+     */
+    override suspend fun reorderPropertyPhotos(
+        userId: String,
+        propertyId: String,
+        orderedIds: List<String>,
+    ) = withContext(Dispatchers.IO) {
+        if (orderedIds.isEmpty()) return@withContext
+
+        val current = propertyPhotoDao
+            .observeForProperty(userId, propertyId)
+            .first()
+
+        if (current.isEmpty()) return@withContext
+
+        val byId = current.associateBy { it.id }
+        val orderedSet = orderedIds.toSet()
+
+        // 1. Фото в заданном порядке
+        val ordered = orderedIds.mapNotNull { byId[it] }
+
+        // 2. Хвост — вдруг появились новые / неучтённые
+        val tail = current.filter { it.id !in orderedSet }
+
+        val now = System.currentTimeMillis()
+        var offset = (ordered.size + tail.size).toLong()
+
+        val newList = (ordered + tail).map { entity ->
+            entity.copy(createdAt = now + offset--)
         }
 
-    override suspend fun transactionsFor(userId: String, propertyId: String): List<Transaction> =
-        withContext(Dispatchers.IO) {
-            transactionDao.listForProperty(userId, propertyId).map { e ->
-                Transaction(
-                    id = e.id,
-                    propertyId = e.propertyId,
-                    type = if (e.isIncome) TxType.INCOME else TxType.EXPENSE,
-                    amount = e.amount,
-                    date = LocalDate.parse(e.dateIso),
-                    note = e.note
-                )
-            }
+        propertyPhotoDao.upsertAll(newList)
+    }
+
+    // ---------- Transactions ----------
+
+    override fun transactions(userId: String): Flow<List<Transaction>> =
+        transactionDao.listAll(userId).map { list ->
+            list.map { it.toModel() }
         }
+
+    override suspend fun transactionsFor(
+        userId: String,
+        propertyId: String,
+    ): List<Transaction> = withContext(Dispatchers.IO) {
+        transactionDao.listForProperty(userId, propertyId).map { it.toModel() }
+    }
 
     override suspend fun addTransaction(
         userId: String,
@@ -205,7 +210,7 @@ class RoomRealEstateRepository @Inject constructor(
         type: TxType,
         amount: Double,
         date: LocalDate,
-        note: String?
+        note: String?,
     ) = withContext(Dispatchers.IO) {
         val entity = TransactionEntity(
             id = UUID.randomUUID().toString(),
@@ -225,17 +230,16 @@ class RoomRealEstateRepository @Inject constructor(
         type: TxType,
         amount: Double,
         date: LocalDate,
-        note: String?
+        note: String?,
     ) = withContext(Dispatchers.IO) {
         val existing = transactionDao.getById(userId, id) ?: return@withContext
-        transactionDao.upsert(
-            existing.copy(
-                isIncome = type == TxType.INCOME,
-                amount = amount,
-                dateIso = date.toString(),
-                note = note
-            )
+        val entity = existing.copy(
+            isIncome = type == TxType.INCOME,
+            amount = amount,
+            dateIso = date.toString(),
+            note = note
         )
+        transactionDao.upsert(entity)
     }
 
     override suspend fun deleteTransaction(userId: String, id: String) =
@@ -243,43 +247,29 @@ class RoomRealEstateRepository @Inject constructor(
             transactionDao.delete(userId, id)
         }
 
-    // ---------- Attachments ----------
+    // ---------- Attachments (documents) ----------
+
     override fun attachments(userId: String, propertyId: String): Flow<List<Attachment>> =
         attachmentDao.observeForProperty(userId, propertyId).map { list ->
-            list.map { e ->
-                Attachment(
-                    id = e.id,
-                    propertyId = e.propertyId,
-                    name = e.name,
-                    mimeType = e.mimeType,
-                    uri = e.uri
-                )
-            }
+            list.map { it.toModel() }
         }
 
-    override suspend fun listAttachments(userId: String, propertyId: String): List<Attachment> =
-        withContext(Dispatchers.IO) {
-            attachmentDao.listForProperty(userId, propertyId).map { e ->
-                Attachment(
-                    id = e.id,
-                    propertyId = e.propertyId,
-                    name = e.name,
-                    mimeType = e.mimeType,
-                    uri = e.uri
-                )
-            }
-        }
+    override suspend fun listAttachments(
+        userId: String,
+        propertyId: String,
+    ): List<Attachment> = withContext(Dispatchers.IO) {
+        attachmentDao.listForProperty(userId, propertyId).map { it.toModel() }
+    }
 
     override suspend fun addAttachment(
         userId: String,
         propertyId: String,
         name: String?,
         mime: String?,
-        uri: String
+        uri: String,
     ) = withContext(Dispatchers.IO) {
-        val id = UUID.randomUUID().toString()
         val entity = AttachmentEntity(
-            id = id,
+            id = UUID.randomUUID().toString(),
             userId = userId,
             propertyId = propertyId,
             name = name,
@@ -294,3 +284,61 @@ class RoomRealEstateRepository @Inject constructor(
             attachmentDao.delete(userId, id)
         }
 }
+
+// ---------- Маппинги сущностей ----------
+
+private fun PropertyEntity.toModel(): Property =
+    Property(
+        id = id,
+        name = name,
+        address = address,
+        monthlyRent = monthlyRent,
+        coverUri = coverUri,
+        leaseFrom = leaseFrom,
+        leaseTo = leaseTo
+    )
+
+private fun Property.toEntity(userId: String): PropertyEntity =
+    PropertyEntity(
+        id = id,
+        userId = userId,
+        name = name,
+        address = address,
+        monthlyRent = monthlyRent,
+        coverUri = coverUri,
+        leaseFrom = leaseFrom,
+        leaseTo = leaseTo
+    )
+
+private fun PropertyDetailsEntity.toModel(): PropertyDetails =
+    PropertyDetails(
+        propertyId = propertyId,
+        description = description,
+        areaSqm = areaSqm
+    )
+
+private fun PropertyPhotoEntity.toModel(): PropertyPhoto =
+    PropertyPhoto(
+        id = id,
+        propertyId = propertyId,
+        uri = uri
+    )
+
+private fun TransactionEntity.toModel(): Transaction =
+    Transaction(
+        id = id,
+        propertyId = propertyId,
+        type = if (isIncome) TxType.INCOME else TxType.EXPENSE,
+        amount = amount,
+        date = LocalDate.parse(dateIso),
+        note = note
+    )
+
+private fun AttachmentEntity.toModel(): Attachment =
+    Attachment(
+        id = id,
+        propertyId = propertyId,
+        name = name,
+        mimeType = mimeType,
+        uri = uri
+    )
