@@ -11,6 +11,7 @@ import com.example.my_project.data.model.PropertyPhoto
 import com.example.my_project.data.model.Transaction
 import com.example.my_project.data.model.TxType
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -22,6 +23,7 @@ import java.time.LocalDate
 import javax.inject.Inject
 
 @HiltViewModel
+@OptIn(ExperimentalCoroutinesApi::class)
 class RealEstateViewModel @Inject constructor(
     private val repo: RealEstateRepository,
     session: UserSession
