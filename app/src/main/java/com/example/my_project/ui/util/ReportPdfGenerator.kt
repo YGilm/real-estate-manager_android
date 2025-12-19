@@ -364,9 +364,10 @@ object ReportPdfGenerator {
 
             val hb = tableTop + 18f
             ctx.canvas.drawText("Месяц", left + 10f, hb, h2)
-            ctx.canvas.drawText("Доход", left + colMonthW + 10f, hb, h2)
-            ctx.canvas.drawText("Расход", left + colMonthW + colIncW + 10f, hb, h2)
-            ctx.canvas.drawText("Итог", right - colNetW + 10f, hb, h2)
+            val h2Right = Paint(h2).apply { textAlign = Paint.Align.RIGHT }
+            ctx.canvas.drawText("Доход", left + colMonthW + colIncW - 10f, hb, h2Right)
+            ctx.canvas.drawText("Расход", left + colMonthW + colIncW + colExpW - 10f, hb, h2Right)
+            ctx.canvas.drawText("Итог", right - 10f, hb, h2Right)
 
             ctx.y = tableTop + headerH
 
@@ -464,10 +465,25 @@ object ReportPdfGenerator {
             ctx.canvas.drawText(monthNameRu(ym), left + 12f, top + 20f, h2)
 
             val net = sum.net
-            val netText = "Итог: ${moneyFormatPlain(net)}"
-            val netPaint = Paint(h2).apply { color = if (net >= 0) INCOME else EXPENSE }
-            val w = netPaint.measureText(netText)
-            ctx.canvas.drawText(netText, right - 12f - w, top + 20f, netPaint)
+            val netAmount = moneyFormatPlain(net)
+
+            val amountPaint = Paint(h2).apply {
+                color = if (net >= 0) INCOME else EXPENSE
+                isFakeBoldText = true
+                textAlign = Paint.Align.RIGHT
+            }
+            val labelPaint = Paint(h2).apply {
+                color = Color.BLACK
+                isFakeBoldText = true
+                textAlign = Paint.Align.RIGHT
+            }
+
+            val amountX = right - 12f
+            val amountW = amountPaint.measureText(netAmount)
+            val labelX = amountX - amountW - 8f
+
+            ctx.canvas.drawText("Итог:", labelX, top + 20f, labelPaint)
+            ctx.canvas.drawText(netAmount, amountX, top + 20f, amountPaint)
 
             ctx.y = top + h + 10f
             return ctx

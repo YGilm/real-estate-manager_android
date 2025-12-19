@@ -152,12 +152,6 @@ class RoomRealEstateRepository @Inject constructor(
             propertyPhotoDao.delete(userId, photoId)
         }
 
-    /**
-     * Перестановка фото.
-     *
-     * Используем поле createdAt как «вес» для сортировки (ORDER BY createdAt DESC),
-     * поэтому просто переназначаем createdAt в новом порядке.
-     */
     override suspend fun reorderPropertyPhotos(
         userId: String,
         propertyId: String,
@@ -174,10 +168,7 @@ class RoomRealEstateRepository @Inject constructor(
         val byId = current.associateBy { it.id }
         val orderedSet = orderedIds.toSet()
 
-        // 1. Фото в заданном порядке
         val ordered = orderedIds.mapNotNull { byId[it] }
-
-        // 2. Хвост — вдруг появились новые / неучтённые
         val tail = current.filter { it.id !in orderedSet }
 
         val now = System.currentTimeMillis()
@@ -211,6 +202,9 @@ class RoomRealEstateRepository @Inject constructor(
         amount: Double,
         date: LocalDate,
         note: String?,
+        attachmentUri: String?,
+        attachmentName: String?,
+        attachmentMime: String?
     ) = withContext(Dispatchers.IO) {
         val entity = TransactionEntity(
             id = UUID.randomUUID().toString(),
@@ -219,7 +213,10 @@ class RoomRealEstateRepository @Inject constructor(
             isIncome = type == TxType.INCOME,
             amount = amount,
             dateIso = date.toString(),
-            note = note
+            note = note,
+            attachmentUri = attachmentUri,
+            attachmentName = attachmentName,
+            attachmentMime = attachmentMime
         )
         transactionDao.upsert(entity)
     }
@@ -231,13 +228,19 @@ class RoomRealEstateRepository @Inject constructor(
         amount: Double,
         date: LocalDate,
         note: String?,
+        attachmentUri: String?,
+        attachmentName: String?,
+        attachmentMime: String?
     ) = withContext(Dispatchers.IO) {
         val existing = transactionDao.getById(userId, id) ?: return@withContext
         val entity = existing.copy(
             isIncome = type == TxType.INCOME,
             amount = amount,
             dateIso = date.toString(),
-            note = note
+            note = note,
+            attachmentUri = attachmentUri,
+            attachmentName = attachmentName,
+            attachmentMime = attachmentMime
         )
         transactionDao.upsert(entity)
     }
@@ -331,7 +334,10 @@ private fun TransactionEntity.toModel(): Transaction =
         type = if (isIncome) TxType.INCOME else TxType.EXPENSE,
         amount = amount,
         date = LocalDate.parse(dateIso),
-        note = note
+        note = note,
+        attachmentUri = attachmentUri,
+        attachmentName = attachmentName,
+        attachmentMime = attachmentMime
     )
 
 private fun AttachmentEntity.toModel(): Attachment =

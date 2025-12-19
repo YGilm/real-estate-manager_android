@@ -15,6 +15,7 @@ enum class TxType { INCOME, EXPENSE }
  * - amount: сумма в деньгах
  * - date: дата операции
  * - note: комментарий
+ * - attachment*: опциональный файл (счёт/чек)
  */
 data class Transaction(
     val id: String = UUID.randomUUID().toString(),
@@ -22,7 +23,11 @@ data class Transaction(
     val type: TxType,
     val amount: Double,
     val date: LocalDate,
-    val note: String? = null
+    val note: String? = null,
+
+    val attachmentUri: String? = null,
+    val attachmentName: String? = null,
+    val attachmentMime: String? = null
 )
 
 /**
@@ -37,7 +42,6 @@ fun Transaction.signedAmountString(
     locale: Locale = Locale("ru", "RU")
 ): String {
     val sign = if (type == TxType.INCOME) "+" else "-"
-    // гарантируем 2 знака после запятой
     val numeric = String.format(locale, "%.2f", amount)
     return sign + numeric
 }

@@ -13,8 +13,8 @@ import com.example.my_project.data.model.TxType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
@@ -29,12 +29,6 @@ class RealEstateViewModel @Inject constructor(
     session: UserSession
 ) : ViewModel() {
 
-    /**
-     * Берём userId из UserSession.userIdFlow (Flow<String?>)
-     * и превращаем в StateFlow, чтобы:
-     * - иметь .value для быстрых операций,
-     * - использовать в других StateFlow.
-     */
     private val userIdFlow: StateFlow<String?> =
         session.userIdFlow.stateIn(
             scope = viewModelScope,
@@ -42,7 +36,6 @@ class RealEstateViewModel @Inject constructor(
             initialValue = null
         )
 
-    /** Список объектов текущего пользователя. */
     val properties: StateFlow<List<Property>> =
         userIdFlow
             .flatMapLatest { uid ->
@@ -54,7 +47,6 @@ class RealEstateViewModel @Inject constructor(
                 initialValue = emptyList()
             )
 
-    /** Все транзакции текущего пользователя. */
     val transactions: StateFlow<List<Transaction>> =
         userIdFlow
             .flatMapLatest { uid ->
@@ -184,10 +176,6 @@ class RealEstateViewModel @Inject constructor(
         }
     }
 
-    /**
-     * Сохранённая перестановка фото.
-     * Вызывается из PropertyInfoScreen, когда пользователь двигает фото стрелками.
-     */
     fun reorderPropertyPhotos(propertyId: String, orderedIds: List<String>) {
         val uid = userIdFlow.value ?: return
         viewModelScope.launch {
@@ -208,7 +196,10 @@ class RealEstateViewModel @Inject constructor(
         isIncome: Boolean,
         amount: Double,
         date: LocalDate,
-        note: String?
+        note: String?,
+        attachmentUri: String? = null,
+        attachmentName: String? = null,
+        attachmentMime: String? = null
     ) {
         val uid = userIdFlow.value ?: return
         viewModelScope.launch {
@@ -218,7 +209,10 @@ class RealEstateViewModel @Inject constructor(
                 type = if (isIncome) TxType.INCOME else TxType.EXPENSE,
                 amount = amount,
                 date = date,
-                note = note
+                note = note,
+                attachmentUri = attachmentUri,
+                attachmentName = attachmentName,
+                attachmentMime = attachmentMime
             )
         }
     }
@@ -228,7 +222,10 @@ class RealEstateViewModel @Inject constructor(
         isIncome: Boolean,
         amount: Double,
         date: LocalDate,
-        note: String?
+        note: String?,
+        attachmentUri: String? = null,
+        attachmentName: String? = null,
+        attachmentMime: String? = null
     ) {
         val uid = userIdFlow.value ?: return
         viewModelScope.launch {
@@ -238,7 +235,10 @@ class RealEstateViewModel @Inject constructor(
                 type = if (isIncome) TxType.INCOME else TxType.EXPENSE,
                 amount = amount,
                 date = date,
-                note = note
+                note = note,
+                attachmentUri = attachmentUri,
+                attachmentName = attachmentName,
+                attachmentMime = attachmentMime
             )
         }
     }

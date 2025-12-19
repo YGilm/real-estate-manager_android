@@ -14,7 +14,7 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PropertyDetailsEntity::class,
         PropertyPhotoEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -33,6 +33,25 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE properties ADD COLUMN leaseFrom TEXT")
                 db.execSQL("ALTER TABLE properties ADD COLUMN leaseTo TEXT")
+            }
+        }
+
+        // ✅ В версии 3 добавляли attachments (на некоторых базах это могло отсутствовать)
+        val MIGRATION_2_3 = object : Migration(2, 3) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS attachments (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        userId TEXT NOT NULL,
+                        propertyId TEXT NOT NULL,
+                        name TEXT,
+                        mimeType TEXT,
+                        uri TEXT NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_attachments_userId_propertyId ON attachments(userId, propertyId)")
             }
         }
 
@@ -63,6 +82,15 @@ abstract class AppDatabase : RoomDatabase() {
                     """.trimIndent()
                 )
                 db.execSQL("CREATE INDEX IF NOT EXISTS index_property_photos_userId_propertyId ON property_photos(userId, propertyId)")
+            }
+        }
+
+        // ✅ Вложения для транзакций (счёт/чек) — безопасно, nullable
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE transactions ADD COLUMN attachmentUri TEXT")
+                db.execSQL("ALTER TABLE transactions ADD COLUMN attachmentName TEXT")
+                db.execSQL("ALTER TABLE transactions ADD COLUMN attachmentMime TEXT")
             }
         }
     }

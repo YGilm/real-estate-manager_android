@@ -54,7 +54,10 @@ interface RealEstateRepository {
         type: TxType,
         amount: Double,
         date: LocalDate,
-        note: String?
+        note: String?,
+        attachmentUri: String? = null,
+        attachmentName: String? = null,
+        attachmentMime: String? = null
     )
 
     suspend fun updateTransaction(
@@ -63,7 +66,10 @@ interface RealEstateRepository {
         type: TxType,
         amount: Double,
         date: LocalDate,
-        note: String?
+        note: String?,
+        attachmentUri: String? = null,
+        attachmentName: String? = null,
+        attachmentMime: String? = null
     )
 
     suspend fun deleteTransaction(userId: String, id: String)
