@@ -14,28 +14,29 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material.icons.filled.ArrowDropUp
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
+import androidx.compose.material3.TabRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -91,7 +92,8 @@ fun StatsScreen(
     val properties by vm.properties.collectAsState()
 
     var selectedPropertyId by rememberSaveable { mutableStateOf<String?>(preselectedPropertyId) }
-    // 0 = Месяц, 1 = Год, 2 = Всё время, 3 = Отчет за период
+
+    // 0 = Месяц, 1 = Год, 2 = Период
     var tab by rememberSaveable { mutableStateOf(1) }
 
     LaunchedEffect(preselectedPropertyId) {
@@ -105,10 +107,18 @@ fun StatsScreen(
         else txs.filter { it.propertyId == selectedPropertyId }
     }
 
+    val selectedProperty: Property? = remember(selectedPropertyId, properties) {
+        if (selectedPropertyId.isNullOrBlank()) null
+        else properties.find { it.id == selectedPropertyId }
+    }
+
     val selectedPropertyName = remember(selectedPropertyId, properties) {
         if (selectedPropertyId.isNullOrBlank()) "Все объекты"
         else properties.find { it.id == selectedPropertyId }?.name ?: "Объект"
     }
+
+    // ВАЖНО: аватар = coverUri
+    val avatarUriForPdf: String? = remember(selectedProperty) { selectedProperty?.coverUri }
 
     Scaffold(
         topBar = {
@@ -116,10 +126,7 @@ fun StatsScreen(
                 title = { Text("Статистика") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Назад"
-                        )
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
                     }
                 }
             )
@@ -129,113 +136,169 @@ fun StatsScreen(
             Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp)
+                .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            PropertyFilterRow(
+            // ✅ Только строка фильтра — на всю ширину, прижата к верху
+            ObjectFilterRowFullWidth(
                 properties = properties,
                 selectedPropertyId = selectedPropertyId,
                 onSelected = { selectedPropertyId = it }
             )
 
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
 
-            ScrollableTabRow(
-                selectedTabIndex = tab,
-                edgePadding = 0.dp
-            ) {
-                TabLabel(tab == 0, { tab = 0 }, "Месяц")
-                TabLabel(tab == 1, { tab = 1 }, "Год")
-                TabLabel(tab == 2, { tab = 2 }, "Всё время")
-                TabLabel(tab == 3, { tab = 3 }, "Отчет за период")
+            StatsTabs(
+                selected = tab,
+                onSelect = { tab = it }
+            )
+
+            Spacer(Modifier.height(10.dp))
+
+            // Контент вкладок занимает остаток и скроллится внутри
+            Box(Modifier.weight(1f)) {
+                when (tab) {
+                    0 -> MonthTabContent(txs = filteredTxs)
+                    1 -> YearTabContent(
+                        txs = filteredTxs,
+                        onOpenMonth = { y, m -> onOpenMonth(y, m, selectedPropertyId) }
+                    )
+                    2 -> PeriodTabContent(
+                        txs = filteredTxs,
+                        propertyName = selectedPropertyName,
+                        propertyAvatarUri = avatarUriForPdf
+                    )
+                }
             }
+        }
+    }
+}
 
-            Spacer(Modifier.height(16.dp))
+/* ===================== Tabs (компактные) ===================== */
 
-            when (tab) {
-                0 -> MonthTab(txs = filteredTxs)
-                1 -> YearTab(
-                    txs = filteredTxs,
-                    onOpenMonth = { y, m -> onOpenMonth(y, m, selectedPropertyId) }
-                )
-                2 -> AllTimeTab(txs = filteredTxs)
-                3 -> PeriodTab(
-                    txs = filteredTxs,
-                    propertyName = selectedPropertyName
+@Composable
+private fun StatsTabs(
+    selected: Int,
+    onSelect: (Int) -> Unit
+) {
+    val labels = listOf("Месяц", "Год", "Период")
+
+    TabRow(selectedTabIndex = selected) {
+        labels.forEachIndexed { index, label ->
+            Tab(
+                selected = selected == index,
+                onClick = { onSelect(index) },
+                text = {
+                    Text(
+                        text = label,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontWeight = if (selected == index) FontWeight.SemiBold else FontWeight.Medium
+                    )
+                }
+            )
+        }
+    }
+}
+
+/* ===================== Фильтр (одна строка, без плашки "Объект") ===================== */
+
+@Composable
+private fun ObjectFilterRowFullWidth(
+    properties: List<Property>,
+    selectedPropertyId: String?,
+    onSelected: (String?) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+
+    val selectedLabel = remember(selectedPropertyId, properties) {
+        if (selectedPropertyId == null) "Все объекты"
+        else properties.find { it.id == selectedPropertyId }?.name ?: "Все объекты"
+    }
+
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        OutlinedTextField(
+            value = selectedLabel,
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            maxLines = 1,
+            label = { Text("Фильтр по объекту") },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
+        )
+
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = { Text("Все объекты") },
+                onClick = { onSelected(null); expanded = false }
+            )
+            properties.forEach { p ->
+                DropdownMenuItem(
+                    text = { Text(p.name) },
+                    onClick = { onSelected(p.id); expanded = false }
                 )
             }
         }
     }
 }
 
-@Composable
-private fun TabLabel(
-    selected: Boolean,
-    onClick: () -> Unit,
-    text: String
-) {
-    val selectedColor = MaterialTheme.colorScheme.primary
-    val unselectedColor = MaterialTheme.colorScheme.onSurfaceVariant
-
-    Tab(
-        selected = selected,
-        onClick = onClick,
-        selectedContentColor = selectedColor,
-        unselectedContentColor = unselectedColor,
-        modifier = Modifier.height(44.dp),
-        text = {
-            Text(
-                text = text,
-                maxLines = 1,
-                softWrap = false,
-                overflow = TextOverflow.Ellipsis,
-                color = if (selected) selectedColor else unselectedColor,
-                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
-                style = MaterialTheme.typography.labelLarge,
-                modifier = Modifier.padding(horizontal = 10.dp, vertical = 2.dp)
-            )
-        }
-    )
-}
-
-/* ===================== Вкладка «Отчет за период» (итоги + share + PDF) ===================== */
+/* ===================== Период ===================== */
 
 @Composable
-private fun PeriodTab(
+private fun PeriodTabContent(
     txs: List<Transaction>,
     propertyName: String,
+    propertyAvatarUri: String?,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
     val today = remember { LocalDate.now() }
-    val defaultFrom = remember(today) { today.withDayOfMonth(1) }
 
-    var fromEpochDay by rememberSaveable { mutableStateOf(defaultFrom.toEpochDay()) }
+    val UNSET = Long.MIN_VALUE
+    var fromEpochDay by rememberSaveable { mutableStateOf(UNSET) }
     var toEpochDay by rememberSaveable { mutableStateOf(today.toEpochDay()) }
+
     var showFromPicker by rememberSaveable { mutableStateOf(false) }
     var showToPicker by rememberSaveable { mutableStateOf(false) }
 
-    val from = remember(fromEpochDay) { LocalDate.ofEpochDay(fromEpochDay) }
+    val fromSelected = fromEpochDay != UNSET
+    val from = remember(fromEpochDay) { if (fromSelected) LocalDate.ofEpochDay(fromEpochDay) else null }
     val to = remember(toEpochDay) { LocalDate.ofEpochDay(toEpochDay) }
 
     val includeFuture = false
 
-    val totals = remember(txs, fromEpochDay, toEpochDay) {
-        txs.computeTotalsInRange(from, to, includeFuture = includeFuture)
-    }
-
     val periodTxs = remember(txs, fromEpochDay, toEpochDay) {
-        txs.inDateRange(from, to, includeFuture = includeFuture)
+        if (!fromSelected) emptyList()
+        else txs.inDateRange(from!!, to, includeFuture = includeFuture)
             .sortedByDescending { it.date }
     }
 
-    val months = remember(fromEpochDay, toEpochDay) { monthsInclusive(from, to) }
+    val totals = remember(txs, fromEpochDay, toEpochDay) {
+        if (!fromSelected) Totals(0.0, 0.0)
+        else txs.computeTotalsInRange(from!!, to, includeFuture = includeFuture)
+    }
+
+    val months = remember(fromEpochDay, toEpochDay) {
+        if (!fromSelected) 1 else monthsInclusive(from!!, to)
+    }
+
     val avgNet = remember(totals, months) { totals.total / months }
 
     val reportText = remember(propertyName, fromEpochDay, toEpochDay, totals, avgNet) {
-        buildPeriodReportText(
+        if (!fromSelected) ""
+        else buildPeriodReportText(
             propertyName = propertyName,
-            from = from,
+            from = from!!,
             to = to,
             totals = totals,
             avgNetPerMonth = avgNet,
@@ -245,7 +308,7 @@ private fun PeriodTab(
 
     if (showFromPicker) {
         val state = rememberDatePickerState(
-            initialSelectedDateMillis = from
+            initialSelectedDateMillis = (from ?: today)
                 .atStartOfDay(ZoneId.systemDefault())
                 .toInstant()
                 .toEpochMilli()
@@ -253,23 +316,18 @@ private fun PeriodTab(
         DatePickerDialog(
             onDismissRequest = { showFromPicker = false },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        val millis = state.selectedDateMillis
-                        if (millis != null) {
-                            val selected = Instant.ofEpochMilli(millis)
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDate()
-                            fromEpochDay = selected.toEpochDay()
-                            if (selected.isAfter(to)) toEpochDay = selected.toEpochDay()
-                        }
-                        showFromPicker = false
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { millis ->
+                        val selected = Instant.ofEpochMilli(millis)
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDate()
+                        fromEpochDay = selected.toEpochDay()
+                        if (selected.isAfter(to)) toEpochDay = selected.toEpochDay()
                     }
-                ) { Text("Ок") }
+                    showFromPicker = false
+                }) { Text("Ок") }
             },
-            dismissButton = {
-                TextButton(onClick = { showFromPicker = false }) { Text("Отмена") }
-            }
+            dismissButton = { TextButton(onClick = { showFromPicker = false }) { Text("Отмена") } }
         ) { DatePicker(state = state) }
     }
 
@@ -283,208 +341,175 @@ private fun PeriodTab(
         DatePickerDialog(
             onDismissRequest = { showToPicker = false },
             confirmButton = {
-                TextButton(
-                    onClick = {
-                        val millis = state.selectedDateMillis
-                        if (millis != null) {
-                            val selected = Instant.ofEpochMilli(millis)
-                                .atZone(ZoneId.systemDefault())
-                                .toLocalDate()
-                            toEpochDay = selected.toEpochDay()
-                            if (selected.isBefore(from)) fromEpochDay = selected.toEpochDay()
-                        }
-                        showToPicker = false
+                TextButton(onClick = {
+                    state.selectedDateMillis?.let { millis ->
+                        val selected = Instant.ofEpochMilli(millis)
+                            .atZone(ZoneId.systemDefault())
+                            .toLocalDate()
+                        toEpochDay = selected.toEpochDay()
+                        if (fromSelected && selected.isBefore(from!!)) fromEpochDay = selected.toEpochDay()
                     }
-                ) { Text("Ок") }
+                    showToPicker = false
+                }) { Text("Ок") }
             },
-            dismissButton = {
-                TextButton(onClick = { showToPicker = false }) { Text("Отмена") }
-            }
+            dismissButton = { TextButton(onClick = { showToPicker = false }) { Text("Отмена") } }
         ) { DatePicker(state = state) }
     }
 
-    Text("Отчет за период", style = MaterialTheme.typography.titleMedium)
-    Spacer(Modifier.height(8.dp))
+    val actionsEnabled = fromSelected
 
-    ElevatedCard(Modifier.fillMaxWidth()) {
-        Column(
-            Modifier.padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        item {
             Text(
-                text = "Период: ${from.format(DateFmtDMY)} — ${to.format(DateFmtDMY)}",
+                text = "Отчет за период",
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.SemiBold
             )
-            Text(
-                text = "Транзакций: ${periodTxs.size} • Месяцев: $months",
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Text(
-                text = "Будущие транзакции не учитываются",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
+        }
 
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Button(onClick = { showFromPicker = true }, modifier = Modifier.weight(1f)) {
-                    Text("С: ${from.format(DateFmtDMY)}")
-                }
-                Button(onClick = { showToPicker = true }, modifier = Modifier.weight(1f)) {
-                    Text("По: ${to.format(DateFmtDMY)}")
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                FilledTonalButton(
-                    onClick = {
-                        val subject =
-                            "Отчёт: $propertyName (${from.format(DateFmtDMY)} — ${to.format(DateFmtDMY)})"
-                        val intent = Intent(Intent.ACTION_SEND).apply {
-                            type = "text/plain"
-                            putExtra(Intent.EXTRA_SUBJECT, subject)
-                            putExtra(Intent.EXTRA_TEXT, reportText)
-                        }
-                        runCatching {
-                            context.startActivity(Intent.createChooser(intent, "Поделиться отчётом"))
-                        }.onFailure {
-                            Toast.makeText(context, "Не удалось поделиться: ${it.message}", Toast.LENGTH_LONG).show()
-                        }
-                    },
-                    modifier = Modifier.weight(1f)
+        item {
+            OutlinedCard(Modifier.fillMaxWidth()) {
+                Column(
+                    Modifier.padding(12.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
-                    Icon(Icons.Filled.Share, contentDescription = null)
-                    Spacer(Modifier.padding(start = 6.dp))
-                    Text("Поделиться", maxLines = 1, overflow = TextOverflow.Ellipsis)
-                }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Button(
+                            onClick = { showFromPicker = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = if (!fromSelected) "С: выбрать" else "С: ${from!!.format(DateFmtDMY)}",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Button(
+                            onClick = { showToPicker = true },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text(
+                                text = "По: ${to.format(DateFmtDMY)}",
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                    }
 
-                Button(
-                    onClick = {
-                        scope.launch {
-                            runCatching {
-                                val pdfFile = withContext(Dispatchers.IO) {
-                                    ReportPdfGenerator.createPeriodPdfReport(
-                                        context = context,
-                                        propertyName = propertyName,
-                                        from = from,
-                                        to = to,
-                                        transactionsInPeriod = periodTxs,
-                                        totals = totals,
-                                        avgNetPerMonth = avgNet,
-                                        includeFuture = includeFuture
-                                    )
-                                }
+                    if (!fromSelected) {
+                        Text(
+                            text = "Выбери дату “С”, чтобы сформировать отчёт.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        Text(
+                            text = "Транзакций: ${periodTxs.size} • Месяцев: $months",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
 
-                                val uri = FileProvider.getUriForFile(
-                                    context,
-                                    "${context.packageName}.fileprovider",
-                                    pdfFile
-                                )
-
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        FilledTonalButton(
+                            onClick = {
                                 val subject =
-                                    "PDF-отчёт: $propertyName (${from.format(DateFmtDMY)} — ${to.format(DateFmtDMY)})"
-
+                                    "Отчёт: $propertyName (${from!!.format(DateFmtDMY)} — ${to.format(DateFmtDMY)})"
                                 val intent = Intent(Intent.ACTION_SEND).apply {
-                                    type = "application/pdf"
+                                    type = "text/plain"
                                     putExtra(Intent.EXTRA_SUBJECT, subject)
-                                    putExtra(Intent.EXTRA_STREAM, uri)
-                                    addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                    putExtra(Intent.EXTRA_TEXT, reportText)
                                 }
-
-                                context.startActivity(Intent.createChooser(intent, "Поделиться PDF-отчётом"))
-                            }.onFailure {
-                                Toast.makeText(context, "Ошибка экспорта PDF: ${it.message}", Toast.LENGTH_LONG).show()
-                            }
+                                runCatching {
+                                    context.startActivity(Intent.createChooser(intent, "Поделиться отчётом"))
+                                }.onFailure {
+                                    Toast.makeText(
+                                        context,
+                                        "Не удалось поделиться: ${it.message}",
+                                        Toast.LENGTH_LONG
+                                    ).show()
+                                }
+                            },
+                            enabled = actionsEnabled,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.Share, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Поделиться", maxLines = 1, overflow = TextOverflow.Ellipsis)
                         }
-                    },
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Icon(Icons.Filled.PictureAsPdf, contentDescription = null)
-                    Spacer(Modifier.padding(start = 6.dp))
-                    Text("Экспорт PDF", maxLines = 1, overflow = TextOverflow.Ellipsis)
+
+                        Button(
+                            onClick = {
+                                scope.launch {
+                                    runCatching {
+                                        val pdfFile = withContext(Dispatchers.IO) {
+                                            ReportPdfGenerator.createPeriodPdfReport(
+                                                context = context,
+                                                propertyName = propertyName,
+                                                from = from!!,
+                                                to = to,
+                                                transactionsInPeriod = periodTxs,
+                                                totals = totals,
+                                                avgNetPerMonth = avgNet,
+                                                includeFuture = false,
+                                                avatarUri = propertyAvatarUri
+                                            )
+                                        }
+
+                                        val uri = FileProvider.getUriForFile(
+                                            context,
+                                            "${context.packageName}.fileprovider",
+                                            pdfFile
+                                        )
+
+                                        val subject =
+                                            "PDF-отчёт: $propertyName (${from!!.format(DateFmtDMY)} — ${to.format(DateFmtDMY)})"
+
+                                        val intent = Intent(Intent.ACTION_SEND).apply {
+                                            type = "application/pdf"
+                                            putExtra(Intent.EXTRA_SUBJECT, subject)
+                                            putExtra(Intent.EXTRA_STREAM, uri)
+                                            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                        }
+                                        context.startActivity(Intent.createChooser(intent, "Поделиться PDF-отчётом"))
+                                    }.onFailure {
+                                        Toast.makeText(
+                                            context,
+                                            "Ошибка экспорта PDF: ${it.message}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                            },
+                            enabled = actionsEnabled,
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Icon(Icons.Filled.PictureAsPdf, contentDescription = null)
+                            Spacer(Modifier.width(8.dp))
+                            Text("Экспорт PDF", maxLines = 1, overflow = TextOverflow.Ellipsis)
+                        }
+                    }
                 }
             }
         }
-    }
 
-    Spacer(Modifier.height(16.dp))
-    TotalsBlock(totals)
-}
-
-/* ===================== Фильтр по объектам ===================== */
-
-@Composable
-private fun PropertyFilterRow(
-    properties: List<Property>,
-    selectedPropertyId: String?,
-    onSelected: (String?) -> Unit
-) {
-    var expanded by remember { mutableStateOf(false) }
-
-    val selectedLabel = remember(selectedPropertyId, properties) {
-        if (selectedPropertyId == null) "Все объекты"
-        else properties.find { it.id == selectedPropertyId }?.name ?: "Все объекты"
-    }
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        Text("Объект:", fontWeight = FontWeight.SemiBold)
-
-        Box {
-            OutlinedTextField(
-                value = selectedLabel,
-                onValueChange = {},
-                readOnly = true,
-                singleLine = true,
-                maxLines = 1,
-                label = { Text("Фильтр") },
-                trailingIcon = {
-                    val icon =
-                        if (expanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = "Раскрыть",
-                        modifier = Modifier
-                            .padding(end = 4.dp)
-                            .clickable { expanded = !expanded }
-                    )
-                },
-                modifier = Modifier
-                    .clickable { expanded = true }
-                    .fillMaxWidth(0.65f)
-            )
-
-            DropdownMenu(
-                expanded = expanded,
-                onDismissRequest = { expanded = false }
-            ) {
-                DropdownMenuItem(
-                    text = { Text("Все объекты") },
-                    onClick = { onSelected(null); expanded = false }
-                )
-                properties.forEach { p ->
-                    DropdownMenuItem(
-                        text = { Text(p.name) },
-                        onClick = { onSelected(p.id); expanded = false }
-                    )
-                }
-            }
-        }
+        item { TotalsBlock(totals) }
     }
 }
 
-/* ===================== Вкладка «Месяц» ===================== */
+/* ===================== Месяц ===================== */
 
 @Composable
-private fun MonthTab(txs: List<Transaction>) {
+private fun MonthTabContent(txs: List<Transaction>) {
     val now = remember { LocalDate.now() }
 
     val years = remember(txs) {
@@ -493,9 +518,6 @@ private fun MonthTab(txs: List<Transaction>) {
             .sortedDescending()
             .ifEmpty { listOf(now.year) }
     }
-
-    var yearExpanded by remember { mutableStateOf(false) }
-    var monthExpanded by remember { mutableStateOf(false) }
 
     var selectedYear by rememberSaveable(years) {
         mutableStateOf(if (years.contains(now.year)) now.year else years.first())
@@ -516,85 +538,7 @@ private fun MonthTab(txs: List<Transaction>) {
         )
     }
 
-    if (!monthsForYear.contains(selectedMonth)) {
-        selectedMonth = monthsForYear.first()
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Box(modifier = Modifier.weight(1f)) {
-            OutlinedTextField(
-                value = selectedYear.toString(),
-                onValueChange = {},
-                readOnly = true,
-                singleLine = true,
-                label = { Text("Год") },
-                trailingIcon = {
-                    val icon =
-                        if (yearExpanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        modifier = Modifier.clickable { yearExpanded = !yearExpanded }
-                    )
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { yearExpanded = true }
-            )
-
-            DropdownMenu(
-                expanded = yearExpanded,
-                onDismissRequest = { yearExpanded = false }
-            ) {
-                years.forEach { y ->
-                    DropdownMenuItem(
-                        text = { Text(y.toString()) },
-                        onClick = { selectedYear = y; yearExpanded = false }
-                    )
-                }
-            }
-        }
-
-        Box(modifier = Modifier.weight(1f)) {
-            OutlinedTextField(
-                value = monthName(selectedMonth),
-                onValueChange = {},
-                readOnly = true,
-                singleLine = true,
-                label = { Text("Месяц") },
-                trailingIcon = {
-                    val icon =
-                        if (monthExpanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = null,
-                        modifier = Modifier.clickable { monthExpanded = !monthExpanded }
-                    )
-                },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { monthExpanded = true }
-            )
-
-            DropdownMenu(
-                expanded = monthExpanded,
-                onDismissRequest = { monthExpanded = false }
-            ) {
-                monthsForYear.forEach { m ->
-                    DropdownMenuItem(
-                        text = { Text(monthName(m)) },
-                        onClick = { selectedMonth = m; monthExpanded = false }
-                    )
-                }
-            }
-        }
-    }
-
-    Spacer(Modifier.height(12.dp))
+    if (!monthsForYear.contains(selectedMonth)) selectedMonth = monthsForYear.first()
 
     val monthTxs = remember(txs, selectedYear, selectedMonth) {
         txs.filter { it.date.year == selectedYear && it.date.monthValue == selectedMonth }
@@ -602,60 +546,65 @@ private fun MonthTab(txs: List<Transaction>) {
     }
 
     val totals = remember(monthTxs) { monthTxs.computeTotals() }
-
-    Text(
-        "Месяц: ${monthName(selectedMonth)} $selectedYear",
-        fontWeight = FontWeight.SemiBold
-    )
-    Spacer(Modifier.height(8.dp))
-    TotalsBlock(totals)
-
-    Spacer(Modifier.height(16.dp))
-    Text("Транзакции", style = MaterialTheme.typography.titleMedium)
-    Spacer(Modifier.height(8.dp))
-
-    if (monthTxs.isEmpty()) {
-        Text("Нет транзакций за выбранный месяц", color = MaterialTheme.colorScheme.onSurfaceVariant)
-        return
-    }
-
     val dateFmt = remember { DateTimeFormatter.ofPattern("dd.MM.yyyy") }
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        items(monthTxs) { t ->
-            val isFuture = t.date.isAfter(LocalDate.now())
-            ElevatedCard(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(12.dp)) {
-                    Text(
-                        text = if (t.type == TxType.INCOME) "Доход" else "Расход",
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isFuture)
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        else
-                            MaterialTheme.colorScheme.onSurface
-                    )
-                    MonthTxMoneyLine(
-                        type = t.type,
-                        amount = t.amount,
-                        muted = isFuture
-                    )
-                    Text(
-                        text = t.date.format(dateFmt),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (isFuture)
-                            MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                        else
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    if (!t.note.isNullOrBlank()) {
-                        Spacer(Modifier.height(4.dp))
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        item {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                SimpleDropdown(
+                    label = "Год",
+                    value = selectedYear.toString(),
+                    items = years.map { it.toString() },
+                    onSelect = { selectedYear = it.toInt() },
+                    modifier = Modifier.weight(1f)
+                )
+                SimpleDropdown(
+                    label = "Месяц",
+                    value = monthName(selectedMonth),
+                    items = monthsForYear.map { monthName(it) },
+                    onSelect = { picked ->
+                        val idx = monthsForYear.indexOfFirst { monthName(it) == picked }
+                        if (idx >= 0) selectedMonth = monthsForYear[idx]
+                    },
+                    modifier = Modifier.weight(1f)
+                )
+            }
+        }
+
+        item { Text("Месяц: ${monthName(selectedMonth)} $selectedYear", fontWeight = FontWeight.SemiBold) }
+        item { TotalsBlock(totals) }
+        item { Text("Транзакции", style = MaterialTheme.typography.titleMedium) }
+
+        if (monthTxs.isEmpty()) {
+            item { Text("Нет транзакций за выбранный месяц", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+        } else {
+            itemsIndexed(monthTxs) { _, t ->
+                val isFuture = t.date.isAfter(LocalDate.now())
+                OutlinedCard(Modifier.fillMaxWidth()) {
+                    Column(Modifier.padding(12.dp)) {
                         Text(
-                            text = t.note!!,
-                            style = MaterialTheme.typography.bodySmall,
+                            text = if (t.type == TxType.INCOME) "Доход" else "Расход",
+                            fontWeight = FontWeight.SemiBold,
                             color = if (isFuture)
                                 MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                            else
-                                MaterialTheme.colorScheme.onSurface
+                            else MaterialTheme.colorScheme.onSurface
                         )
+                        MonthTxMoneyLine(type = t.type, amount = t.amount, muted = isFuture)
+                        Text(
+                            text = t.date.format(dateFmt),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        if (!t.note.isNullOrBlank()) {
+                            Spacer(Modifier.height(4.dp))
+                            Text(text = t.note!!, style = MaterialTheme.typography.bodySmall)
+                        }
                     }
                 }
             }
@@ -663,10 +612,10 @@ private fun MonthTab(txs: List<Transaction>) {
     }
 }
 
-/* ===================== Вкладка «Год» ===================== */
+/* ===================== Год ===================== */
 
 @Composable
-private fun YearTab(
+private fun YearTabContent(
     txs: List<Transaction>,
     onOpenMonth: (year: Int, month: Int) -> Unit
 ) {
@@ -694,69 +643,33 @@ private fun YearTab(
         )
     }
 
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Text("Год:", fontWeight = FontWeight.SemiBold)
-
-        var expanded by remember { mutableStateOf(false) }
-        Box {
-            OutlinedTextField(
+        item {
+            SimpleDropdown(
+                label = "Год",
                 value = selectedYear.toString(),
-                onValueChange = {},
-                readOnly = true,
-                singleLine = true,
-                maxLines = 1,
-                label = { Text("Год") },
-                trailingIcon = {
-                    val icon =
-                        if (expanded) Icons.Filled.ArrowDropUp else Icons.Filled.ArrowDropDown
-                    Icon(
-                        imageVector = icon,
-                        contentDescription = "Раскрыть",
-                        modifier = Modifier
-                            .padding(end = 4.dp)
-                            .clickable { expanded = !expanded }
-                    )
-                },
-                modifier = Modifier
-                    .clickable { expanded = true }
-                    .fillMaxWidth(0.42f)
+                items = years.map { it.toString() },
+                onSelect = { selectedYear = it.toInt() },
+                modifier = Modifier.fillMaxWidth(0.55f)
             )
-            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-                years.forEach { y ->
-                    DropdownMenuItem(
-                        text = { Text(y.toString()) },
-                        onClick = { selectedYear = y; expanded = false }
-                    )
-                }
-            }
         }
-    }
 
-    Spacer(Modifier.height(12.dp))
-    TotalsBlock(yearTotals)
+        item { TotalsBlock(yearTotals) }
+        item { Text("По месяцам", style = MaterialTheme.typography.titleMedium) }
 
-    Spacer(Modifier.height(16.dp))
-    Text("По месяцам", style = MaterialTheme.typography.titleMedium)
-    Spacer(Modifier.height(8.dp))
-
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         items(byMonth) { row ->
-            ElevatedCard(
+            OutlinedCard(
                 Modifier
                     .fillMaxWidth()
                     .clickable { onOpenMonth(selectedYear, row.month) }
             ) {
-                Column(
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(12.dp)
-                ) {
+                Column(Modifier.padding(12.dp)) {
                     Text(monthName(row.month), fontWeight = FontWeight.SemiBold)
                     Spacer(Modifier.height(8.dp))
-                    Column(horizontalAlignment = Alignment.End) {
+                    Column(horizontalAlignment = Alignment.End, modifier = Modifier.fillMaxWidth()) {
                         MoneyLineLabel("Доход:", TxType.INCOME, row.totals.income)
                         MoneyLineLabel("Расход:", TxType.EXPENSE, row.totals.expense)
                         MoneyLineTotal("Итого:", row.totals.total)
@@ -767,14 +680,46 @@ private fun YearTab(
     }
 }
 
-/* ===================== Вкладка «Всё время» ===================== */
+/* ===================== Простой dropdown (компактный) ===================== */
 
 @Composable
-private fun AllTimeTab(txs: List<Transaction>) {
-    val totals = remember(txs) { txs.computeTotals() }
-    Text("За всё время", style = MaterialTheme.typography.titleMedium)
-    Spacer(Modifier.height(8.dp))
-    TotalsBlock(totals)
+private fun SimpleDropdown(
+    label: String,
+    value: String,
+    items: List<String>,
+    onSelect: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var expanded by remember { mutableStateOf(false) }
+    ExposedDropdownMenuBox(
+        expanded = expanded,
+        onExpandedChange = { expanded = !expanded },
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = {},
+            readOnly = true,
+            singleLine = true,
+            maxLines = 1,
+            label = { Text(label) },
+            modifier = Modifier
+                .menuAnchor()
+                .fillMaxWidth(),
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
+        )
+        ExposedDropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            items.forEach { item ->
+                DropdownMenuItem(
+                    text = { Text(item) },
+                    onClick = { onSelect(item); expanded = false }
+                )
+            }
+        }
+    }
 }
 
 /* ===================== Общие UI-компоненты денег ===================== */

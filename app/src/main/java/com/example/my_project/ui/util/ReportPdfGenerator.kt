@@ -1,10 +1,9 @@
 package com.example.my_project.ui.util
 
 import android.content.Context
-import android.graphics.Color
-import android.graphics.Paint
-import android.graphics.RectF
+import android.graphics.*
 import android.graphics.pdf.PdfDocument
+import android.net.Uri
 import android.text.TextPaint
 import android.text.TextUtils
 import com.example.my_project.data.model.Transaction
@@ -29,7 +28,6 @@ object ReportPdfGenerator {
 
     // Theme
     private val PRIMARY = Color.parseColor("#1E5AA8")
-    private val PRIMARY_DARK = Color.parseColor("#16457F")
     private val INCOME = Color.parseColor("#1B8E4B")
     private val EXPENSE = Color.parseColor("#C62828")
     private val NEUTRAL_BG = Color.parseColor("#F7F8FA")
@@ -37,10 +35,6 @@ object ReportPdfGenerator {
     private val TEXT_MUTED = Color.parseColor("#5B6775")
     private val ROW_ALT = Color.parseColor("#F3F5F8")
 
-    /**
-     * Красивый PDF-отчёт по выбранному периоду.
-     * transactionsInPeriod должны быть уже отфильтрованы по датам (и по includeFuture, если нужно).
-     */
     fun createPeriodPdfReport(
         context: Context,
         propertyName: String,
@@ -49,14 +43,14 @@ object ReportPdfGenerator {
         transactionsInPeriod: List<Transaction>,
         totals: Totals,
         avgNetPerMonth: Double,
-        includeFuture: Boolean = false
+        includeFuture: Boolean = false,
+        avatarUri: String? = null
     ): File {
         val safeFrom = if (from.isAfter(to)) to else from
         val safeTo = if (from.isAfter(to)) from else to
 
         val reportsDir = File(context.cacheDir, "reports").apply { mkdirs() }
-        val fileName = "report_${safeFrom}_$safeTo.pdf"
-        val outFile = File(reportsDir, fileName)
+        val outFile = File(reportsDir, "report_${safeFrom}_$safeTo.pdf")
 
         val doc = PdfDocument()
 
@@ -118,12 +112,8 @@ object ReportPdfGenerator {
             color = PRIMARY
             style = Paint.Style.FILL
         }
-        val primaryDarkFill = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-            color = PRIMARY_DARK
-            style = Paint.Style.FILL
-        }
 
-        // Table column widths (detail table)
+        // Detail “columns”
         val colDateW = 78f
         val colTypeW = 62f
         val colAmountW = 92f
@@ -157,7 +147,71 @@ object ReportPdfGenerator {
             MonthSum(ym, inc, exp)
         }
 
-        // Page context
+        // ---------- Avatar helpers ----------
+        fun tryDecodeAvatar(ctx: Context, raw: String): Bitmap? {
+            val s = raw.trim()
+            if (s.isBlank()) return null
+
+            return runCatching {
+                when {
+                    s.startsWith("content://") || s.startsWith("file://") -> {
+                        val uri = Uri.parse(s)
+                        ctx.contentResolver.openInputStream(uri)?.use { input ->
+                            BitmapFactory.decodeStream(input)
+                        }
+                    }
+                    s.startsWith("/") -> {
+                        val f = File(s)
+                        if (f.exists()) BitmapFactory.decodeFile(f.absolutePath) else null
+                    }
+                    else -> {
+                        val f = File(s)
+                        if (f.exists()) BitmapFactory.decodeFile(f.absolutePath) else null
+                    }
+                }
+            }.getOrNull()
+        }
+
+        fun centerCropSquare(src: Bitmap): Bitmap {
+            val size = min(src.width, src.height)
+            val x = (src.width - size) / 2
+            val y = (src.height - size) / 2
+            return Bitmap.createBitmap(src, x, y, size, size)
+        }
+
+        /**
+         * Премиальный аватар: мягкая тень + без белой обводки.
+         * Важно: setShadowLayer работает на software-рендере (PdfDocument рисует в Bitmap, ок).
+         */
+        fun drawCircleAvatar(canvas: Canvas, bmp: Bitmap, cx: Float, cy: Float, radius: Float) {
+            // 1) Тень (рисуем под аватаром)
+            val shadowPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                color = Color.TRANSPARENT
+                // лёгкая тень вниз/вправо
+                setShadowLayer(
+                    /* radius = */ 10f,
+                    /* dx = */ 0f,
+                    /* dy = */ 4f,
+                    /* shadowColor = */ 0x55000000
+                )
+            }
+            // небольшой “подложкой” круг, чтобы тень была стабильной
+            canvas.drawCircle(cx, cy, radius, shadowPaint)
+
+            // 2) Сам аватар с клипом
+            val square = centerCropSquare(bmp)
+            val dst = RectF(cx - radius, cy - radius, cx + radius, cy + radius)
+
+            val save = canvas.save()
+            val clip = Path().apply { addCircle(cx, cy, radius, Path.Direction.CW) }
+            canvas.clipPath(clip)
+            canvas.drawBitmap(square, null, dst, null)
+            canvas.restoreToCount(save)
+        }
+
+        val avatarBitmap: Bitmap? = avatarUri?.let { tryDecodeAvatar(context, it) }
+
+        // ---------- Page context ----------
         class PageCtx(var pageNumber: Int) {
             var page: PdfDocument.Page =
                 doc.startPage(PdfDocument.PageInfo.Builder(PAGE_W, PAGE_H, pageNumber).create())
@@ -166,10 +220,7 @@ object ReportPdfGenerator {
         }
 
         fun finishPage(ctx: PageCtx) {
-            // Footer
             val footerY = PAGE_H - margin + 6f
-
-            // separator
             ctx.canvas.drawLine(left, PAGE_H - margin - 10f, right, PAGE_H - margin - 10f, line)
 
             val created = "Сформировано: ${LocalDate.now().format(createdFmt)}"
@@ -182,10 +233,7 @@ object ReportPdfGenerator {
             doc.finishPage(ctx.page)
         }
 
-        /**
-         * Новая страница БЕЗ синей шапки (после первой).
-         * Оставляем только маленькую строку (для ориентира) без заливки.
-         */
+        /** Новая страница БЕЗ синей шапки (после первой). */
         fun newPagePlainHeader(ctx: PageCtx): PageCtx {
             finishPage(ctx)
             val next = PageCtx(ctx.pageNumber + 1)
@@ -200,9 +248,7 @@ object ReportPdfGenerator {
         }
 
         fun ensureSpace(ctx: PageCtx, need: Float): PageCtx {
-            return if (ctx.y + need > PAGE_H - margin - 24f) {
-                newPagePlainHeader(ctx)
-            } else ctx
+            return if (ctx.y + need > PAGE_H - margin - 24f) newPagePlainHeader(ctx) else ctx
         }
 
         fun roundRect(ctx: PageCtx, rect: RectF, radius: Float, fill: Paint, strokePaint: Paint? = null) {
@@ -213,23 +259,36 @@ object ReportPdfGenerator {
         fun drawTopHeader(ctx0: PageCtx): PageCtx {
             val ctx = ctx0
 
-            // Big colored header (ONLY first page)
+            // Big colored header (ONLY first page) — один цвет
             val barH = 92f
-            ctx.canvas.drawRect(left, margin - 6f, right, margin - 6f + barH, primaryFill)
-            ctx.canvas.drawRect(left, margin - 6f + barH - 10f, right, margin - 6f + barH, primaryDarkFill)
+            val top = margin - 6f
+            ctx.canvas.drawRect(left, top, right, top + barH, primaryFill)
 
-            val title = "Отчёт по доходам и расходам"
-            ctx.canvas.drawText(title, left + 16f, margin - 6f + 28f, titlePaint)
+            // Большой аватар (почти впритык)
+            val avatarInset = 8f
+            val avatarRadius = (barH / 2f) - avatarInset
+            val avatarReserveRight = if (avatarBitmap != null) (avatarRadius * 2f + avatarInset + 6f) else 0f
+
+            ctx.canvas.drawText("Отчёт по доходам и расходам", left + 16f, top + 28f, titlePaint)
 
             val sub1 = "Объект: $propertyName"
             val sub2 = "Период: ${safeFrom.format(dateFmt)} — ${safeTo.format(dateFmt)}"
-            ctx.canvas.drawText(sub1, left + 16f, margin - 6f + 52f, subtitlePaint)
-            ctx.canvas.drawText(sub2, left + 16f, margin - 6f + 72f, subtitlePaint)
 
-            val note = if (includeFuture) "Включая будущие транзакции" else "Будущие транзакции не учитываются"
-            ctx.canvas.drawText(note, right - 16f - subtitlePaint.measureText(note), margin - 6f + 72f, subtitlePaint)
+            val maxSubWidth = (right - 16f - avatarReserveRight) - (left + 16f)
+            val tp = TextPaint(subtitlePaint)
+            val sub1Fit = TextUtils.ellipsize(sub1, tp, maxSubWidth, TextUtils.TruncateAt.END).toString()
+            val sub2Fit = TextUtils.ellipsize(sub2, tp, maxSubWidth, TextUtils.TruncateAt.END).toString()
 
-            ctx.y = margin - 6f + barH + 18f
+            ctx.canvas.drawText(sub1Fit, left + 16f, top + 52f, subtitlePaint)
+            ctx.canvas.drawText(sub2Fit, left + 16f, top + 72f, subtitlePaint)
+
+            if (avatarBitmap != null) {
+                val cx = right - avatarInset - avatarRadius
+                val cy = top + (barH / 2f)
+                drawCircleAvatar(ctx.canvas, avatarBitmap, cx, cy, avatarRadius)
+            }
+
+            ctx.y = top + barH + 18f
             return ctx
         }
 
@@ -244,13 +303,7 @@ object ReportPdfGenerator {
             val cardH = 54f
             val cardW = (width - gap) / 2f
 
-            fun card(
-                x: Float,
-                yTop: Float,
-                title: String,
-                value: String,
-                accentColor: Int
-            ) {
+            fun card(x: Float, yTop: Float, title: String, value: String, accentColor: Int) {
                 val rect = RectF(x, yTop, x + cardW, yTop + cardH)
                 roundRect(ctx, rect, 12f, fillNeutral, stroke)
 
@@ -278,7 +331,7 @@ object ReportPdfGenerator {
             val row2Y = row1Y + cardH + gap
             val netAccent = if (totals.total >= 0) INCOME else EXPENSE
             card(left, row2Y, "Реальная чистая выручка", netText, netAccent)
-            card(left + cardW + gap, row2Y, "Средняя чистая выручка / мес", avgText, PRIMARY_DARK)
+            card(left + cardW + gap, row2Y, "Средняя чистая выручка / мес", avgText, PRIMARY)
 
             ctx.y = row2Y + cardH + 18f
             return ctx
@@ -296,7 +349,7 @@ object ReportPdfGenerator {
             ctx = ensureSpace(ctx, 140f)
 
             ctx.canvas.drawText("Сводка по месяцам", left, ctx.y + h1.textSize, h1)
-            ctx.y += 22f // ↑ УВЕЛИЧИЛИ ОТСТУП ПОСЛЕ ЗАГОЛОВКА
+            ctx.y += 22f
 
             val tableTop = ctx.y
             val headerH = 26f
@@ -333,9 +386,7 @@ object ReportPdfGenerator {
                 ctx = ensureSpace(ctx, rowH + 6f)
 
                 val yTop = ctx.y
-                if (idx % 2 == 1) {
-                    ctx.canvas.drawRect(RectF(left, yTop, right, yTop + rowH), fillAlt)
-                }
+                if (idx % 2 == 1) ctx.canvas.drawRect(RectF(left, yTop, right, yTop + rowH), fillAlt)
                 ctx.canvas.drawLine(left, yTop + rowH, right, yTop + rowH, line)
 
                 val base = yTop + 16.5f
@@ -356,23 +407,17 @@ object ReportPdfGenerator {
                 ctx.y += rowH
             }
 
-            ctx.y += 18f // чуть больше “воздуха” после таблицы
+            ctx.y += 18f
             return ctx
         }
 
-        fun wrapText(
-            text: String,
-            paint: Paint,
-            maxWidth: Float,
-            maxLines: Int
-        ): List<String> {
+        fun wrapText(text: String, paint: Paint, maxWidth: Float, maxLines: Int): List<String> {
             val cleaned = text.replace("\n", " ").trim()
             if (cleaned.isBlank()) return listOf("—")
 
             val tp = TextPaint(paint)
             val words = cleaned.split(Regex("\\s+"))
             val lines = ArrayList<String>(min(8, maxLines))
-
             var current = StringBuilder()
 
             fun flush() {
@@ -385,15 +430,12 @@ object ReportPdfGenerator {
             for (w in words) {
                 val candidate = if (current.isEmpty()) w else "${current} $w"
                 if (tp.measureText(candidate) <= maxWidth) {
-                    current.clear()
-                    current.append(candidate)
+                    current.clear(); current.append(candidate)
                 } else {
                     flush()
                     if (lines.size >= maxLines) break
-
                     if (tp.measureText(w) > maxWidth) {
-                        val chopped = TextUtils.ellipsize(w, tp, maxWidth, TextUtils.TruncateAt.END).toString()
-                        lines.add(chopped)
+                        lines.add(TextUtils.ellipsize(w, tp, maxWidth, TextUtils.TruncateAt.END).toString())
                     } else {
                         current.append(w)
                     }
@@ -406,7 +448,6 @@ object ReportPdfGenerator {
                 val last = lines.last()
                 lines[lines.lastIndex] = TextUtils.ellipsize(last, tp, maxWidth, TextUtils.TruncateAt.END).toString()
             }
-
             return if (lines.isEmpty()) listOf("—") else lines
         }
 
@@ -416,13 +457,11 @@ object ReportPdfGenerator {
 
             val top = ctx.y
             val h = 30f
-
             val rect = RectF(left, top, right, top + h)
             val fill = Paint(Paint.ANTI_ALIAS_FLAG).apply { color = Color.parseColor("#EEF3FF") }
             roundRect(ctx, rect, 12f, fill, stroke)
 
-            val label = monthNameRu(ym)
-            ctx.canvas.drawText(label, left + 12f, top + 20f, h2)
+            ctx.canvas.drawText(monthNameRu(ym), left + 12f, top + 20f, h2)
 
             val net = sum.net
             val netText = "Итог: ${moneyFormatPlain(net)}"
@@ -439,35 +478,28 @@ object ReportPdfGenerator {
 
             val dateText = t.date.format(dateFmt)
             val typeText = if (t.type == TxType.INCOME) "Доход" else "Расход"
-            val amountText = if (t.type == TxType.INCOME) "+${moneyFormatPlain(t.amount)}" else "-${moneyFormatPlain(t.amount)}"
+            val amountText =
+                if (t.type == TxType.INCOME) "+${moneyFormatPlain(t.amount)}" else "-${moneyFormatPlain(t.amount)}"
             val note = t.note?.trim().orEmpty().ifBlank { "—" }
 
             val lineHeight = 13.5f
-            val maxNoteLines = 3
-            val wrapped = wrapText(note, body, colNoteW, maxNoteLines)
-            val linesCount = max(1, wrapped.size)
-            val rowH = (linesCount * lineHeight) + 10f
+            val wrapped = wrapText(note, body, colNoteW, 3)
+            val rowH = (max(1, wrapped.size) * lineHeight) + 10f
 
             ctx = ensureSpace(ctx, rowH + 6f)
 
             val top = ctx.y
-            if (idx % 2 == 1) {
-                ctx.canvas.drawRect(RectF(left, top - 2f, right, top + rowH), fillAlt)
-            }
+            if (idx % 2 == 1) ctx.canvas.drawRect(RectF(left, top - 2f, right, top + rowH), fillAlt)
 
             val base = top + 16.5f
-
-            // Date
             ctx.canvas.drawText(dateText, left + 10f, base, body)
 
-            // Type colored
             val typePaint = Paint(body).apply {
                 color = if (t.type == TxType.INCOME) INCOME else EXPENSE
                 isFakeBoldText = true
             }
             ctx.canvas.drawText(typeText, left + 10f + colDateW + colGap, base, typePaint)
 
-            // Note wrapped
             val noteX = left + 10f + colDateW + colGap + colTypeW + colGap
             var nb = base
             for (lineText in wrapped) {
@@ -475,7 +507,6 @@ object ReportPdfGenerator {
                 nb += lineHeight
             }
 
-            // Amount right aligned
             val amountPaint = Paint(body).apply {
                 color = if (t.type == TxType.INCOME) INCOME else EXPENSE
                 isFakeBoldText = true
@@ -483,24 +514,21 @@ object ReportPdfGenerator {
             val aw = amountPaint.measureText(amountText)
             ctx.canvas.drawText(amountText, right - 10f - aw, base, amountPaint)
 
-            // divider
             ctx.canvas.drawLine(left, top + rowH, right, top + rowH, line)
-
             ctx.y = top + rowH + 6f
             return ctx
         }
 
         // ---------- Build PDF ----------
-
         var ctx = PageCtx(1)
-        ctx = drawTopHeader(ctx) // только на первой странице синяя шапка
+        ctx = drawTopHeader(ctx)
 
         ctx = drawSummaryCards(ctx)
         ctx = drawMonthSummaryTable(ctx)
 
         ctx = ensureSpace(ctx, 40f)
         ctx.canvas.drawText("Детализация транзакций", left, ctx.y + h1.textSize, h1)
-        ctx.y += 22f // ↑ УВЕЛИЧИЛИ ОТСТУП ПОСЛЕ ЗАГОЛОВКА
+        ctx.y += 22f
 
         if (txSorted.isEmpty()) {
             ctx = ensureSpace(ctx, 40f)
@@ -512,14 +540,11 @@ object ReportPdfGenerator {
                 val sum = monthSums.firstOrNull { it.ym == ym } ?: MonthSum(ym, 0.0, 0.0)
 
                 ctx = drawMonthGroupHeader(ctx, ym, sum)
-                // ШАПКУ "Дата / Тип / Комментарий / Сумма" УБРАЛИ — больше не рисуем
 
                 monthTx.forEachIndexed { i, t ->
-                    val beforePage = ctx.pageNumber
+                    val before = ctx.pageNumber
                     ctx = drawTransactionRow(ctx, i, t)
-
-                    // Если произошёл переход страницы — повторяем только заголовок месяца (без табличной шапки)
-                    if (ctx.pageNumber != beforePage) {
+                    if (ctx.pageNumber != before) {
                         ctx = drawMonthGroupHeader(ctx, ym, sum)
                     }
                 }
@@ -531,11 +556,8 @@ object ReportPdfGenerator {
 
         finishPage(ctx)
 
-        FileOutputStream(outFile).use { fos ->
-            doc.writeTo(fos)
-        }
+        FileOutputStream(outFile).use { fos -> doc.writeTo(fos) }
         doc.close()
-
         return outFile
     }
 }
