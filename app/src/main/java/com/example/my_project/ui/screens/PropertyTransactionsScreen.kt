@@ -23,13 +23,13 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.filled.OpenInNew
-import androidx.compose.material.icons.filled.ReceiptLong
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -294,7 +294,7 @@ private fun TransactionDetailsSheet(
                     )
 
                     if (!transaction.note.isNullOrBlank()) {
-                        Divider(Modifier.padding(top = 6.dp))
+                        HorizontalDivider(Modifier.padding(top = 6.dp))
                         Text(text = transaction.note!!, style = MaterialTheme.typography.bodyMedium)
                     }
                 }
@@ -308,7 +308,7 @@ private fun TransactionDetailsSheet(
                         verticalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(Icons.Filled.ReceiptLong, contentDescription = null)
+                            Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null)
                             Spacer(Modifier.width(8.dp))
                             Text(
                                 text = shownName,
@@ -331,7 +331,7 @@ private fun TransactionDetailsSheet(
                                 },
                                 modifier = Modifier.width(220.dp)
                             ) {
-                                Icon(Icons.Filled.OpenInNew, contentDescription = null)
+                                Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = null)
                                 Spacer(Modifier.width(8.dp))
                                 Text("Открыть файл")
                             }

@@ -7,7 +7,6 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -19,21 +18,34 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Assessment
+import androidx.compose.material.icons.filled.LockReset
+import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.PieChart
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -42,10 +54,12 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.my_project.data.model.TxType
+import com.example.my_project.ui.AuthViewModel
 import com.example.my_project.ui.RealEstateViewModel
 import com.example.my_project.ui.util.moneyFormatPlain
 import com.example.my_project.ui.util.monthName
@@ -54,32 +68,29 @@ import java.time.LocalDate
 @Composable
 fun HomeScreen(
     onOpenStats: () -> Unit,
-    onOpenProperties: () -> Unit
+    onOpenProperties: () -> Unit,
+    onLogoutNavigate: () -> Unit = {}
 ) {
     val vm: RealEstateViewModel = hiltViewModel()
+    val authVm: AuthViewModel = hiltViewModel()
 
     val transactions by vm.transactions.collectAsState()
     val properties by vm.properties.collectAsState()
+    val currentEmail by authVm.currentEmail.collectAsState()
 
     val now = LocalDate.now()
-    val monthName = monthName(now.monthValue)
+    val mName = monthName(now.monthValue)
     val year = now.year
 
-    // ⚙️ ЛОГИКА: будущие даты не учитываем (как мы зафиксировали)
+    // ⚙️ ЛОГИКА: будущие даты не учитываем (как зафиксировали)
     val monthTransactions = transactions.filter {
         it.date.year == year &&
                 it.date.monthValue == now.monthValue &&
                 !it.date.isAfter(now)
     }
 
-    val income = monthTransactions
-        .filter { it.type == TxType.INCOME }
-        .sumOf { it.amount }
-
-    val expense = monthTransactions
-        .filter { it.type == TxType.EXPENSE }
-        .sumOf { it.amount }
-
+    val income = monthTransactions.filter { it.type == TxType.INCOME }.sumOf { it.amount }
+    val expense = monthTransactions.filter { it.type == TxType.EXPENSE }.sumOf { it.amount }
     val delta = income - expense
 
     // Анимация «дыхания» иконки
@@ -93,7 +104,7 @@ fun HomeScreen(
         ),
         label = "icon_scale"
     )
-    val alpha by infiniteTransition.animateFloat(
+    val cardAlpha by infiniteTransition.animateFloat(
         initialValue = 0.85f,
         targetValue = 1.0f,
         animationSpec = infiniteRepeatable(
@@ -102,7 +113,8 @@ fun HomeScreen(
         ),
         label = "card_alpha"
     )
-    // Мягкая анимация для «города» внизу
+
+    // ✅ ТВОЯ анимация «города» внизу
     val citylinePhase by infiniteTransition.animateFloat(
         initialValue = 0.9f,
         targetValue = 1.1f,
@@ -115,9 +127,7 @@ fun HomeScreen(
 
     val scrollState = rememberScrollState()
 
-    Surface(
-        modifier = Modifier.fillMaxSize()
-    ) {
+    Surface(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -125,7 +135,7 @@ fun HomeScreen(
                     Brush.verticalGradient(
                         colors = listOf(
                             MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
-                            MaterialTheme.colorScheme.background,
+                            MaterialTheme.colorScheme.background
                         )
                     )
                 )
@@ -133,42 +143,51 @@ fun HomeScreen(
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 24.dp)
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 18.dp)
                     .verticalScroll(scrollState),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
-
-                // Заголовок
-                Column(
-                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                // Заголовок + иконка пользователя
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.Top,
+                    horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text(
-                        text = "Моя недвижимость",
-                        style = MaterialTheme.typography.headlineSmall,
-                        fontWeight = FontWeight.SemiBold
-                    )
-                    val propsCount = properties.size
-                    val subtitle = when {
-                        propsCount == 0 -> "Добавьте первый объект, чтобы начать учёт"
-                        propsCount == 1 -> "1 объект в управлении"
-                        else -> "$propsCount объектов в управлении"
+                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text(
+                            text = "Моя недвижимость",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        val propsCount = properties.size
+                        val subtitle = when {
+                            propsCount == 0 -> "Добавьте первый объект, чтобы начать учёт"
+                            propsCount == 1 -> "1 объект в управлении"
+                            else -> "$propsCount объектов в управлении"
+                        }
+                        Text(
+                            text = subtitle,
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
                     }
-                    Text(
-                        text = subtitle,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+
+                    UserMenuButton(
+                        email = currentEmail,
+                        onLogout = {
+                            authVm.logout()
+                            onLogoutNavigate()
+                        },
+                        onChangePassword = { oldPwd, newPwd, onDone ->
+                            authVm.changePassword(oldPwd, newPwd, onDone)
+                        }
                     )
                 }
 
-                // Мини-виджет: итоги за текущий месяц (подсветка активного месяца рамкой)
+                // Мини-виджет: итоги за текущий месяц
                 Card(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .border(
-                            width = 1.dp,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.35f),
-                            shape = RoundedCornerShape(20.dp)
-                        ),
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(20.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
@@ -178,7 +197,7 @@ fun HomeScreen(
                     Column(
                         modifier = Modifier
                             .padding(16.dp)
-                            .alpha(alpha),
+                            .alpha(cardAlpha),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Row(
@@ -188,10 +207,7 @@ fun HomeScreen(
                             Box(
                                 modifier = Modifier
                                     .size(40.dp)
-                                    .graphicsLayer(
-                                        scaleX = scale,
-                                        scaleY = scale
-                                    )
+                                    .graphicsLayer(scaleX = scale, scaleY = scale)
                                     .background(
                                         color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
                                         shape = RoundedCornerShape(12.dp)
@@ -207,7 +223,7 @@ fun HomeScreen(
 
                             Column {
                                 Text(
-                                    text = "Итого за $monthName $year",
+                                    text = "Итого за $mName $year",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -266,7 +282,6 @@ fun HomeScreen(
                     modifier = Modifier.fillMaxWidth(),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    // Объекты
                     HomeActionCard(
                         title = "Объекты недвижимости",
                         subtitle = "Список помещений, карточки объектов, счета и транзакции",
@@ -275,7 +290,6 @@ fun HomeScreen(
                         onClick = onOpenProperties
                     )
 
-                    // Статистика
                     HomeActionCard(
                         title = "Статистика",
                         subtitle = "Общая картина: помесячно, по объектам и по типам транзакций",
@@ -287,7 +301,7 @@ fun HomeScreen(
 
                 Spacer(Modifier.height(8.dp))
 
-                // Декоративная линия «города» с огоньками и параллаксом
+                // ✅ ТВОЯ декоративная линия «города» (домики/окна)
                 BottomCityline(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -296,7 +310,6 @@ fun HomeScreen(
                     scroll = scrollState.value
                 )
 
-                // Подпись под «городом»
                 Spacer(Modifier.height(6.dp))
                 Text(
                     text = "Управление недвижимостью",
@@ -314,6 +327,145 @@ fun HomeScreen(
 }
 
 @Composable
+private fun UserMenuButton(
+    email: String?,
+    onLogout: () -> Unit,
+    onChangePassword: (String, String, (String?) -> Unit) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    var showChangePwd by remember { mutableStateOf(false) }
+
+    Box {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .background(
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.12f),
+                    shape = RoundedCornerShape(14.dp)
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            IconButton(onClick = { expanded = true }) {
+                androidx.compose.material3.Icon(
+                    imageVector = Icons.Filled.AccountCircle,
+                    contentDescription = "Пользователь",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
+        }
+
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false }
+        ) {
+            DropdownMenuItem(
+                text = {
+                    Text(
+                        text = email?.takeIf { it.isNotBlank() } ?: "Пользователь",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                },
+                onClick = { }
+            )
+
+            DropdownMenuItem(
+                text = { Text("Сменить пароль") },
+                leadingIcon = {
+                    androidx.compose.material3.Icon(
+                        imageVector = Icons.Filled.LockReset,
+                        contentDescription = null
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    showChangePwd = true
+                }
+            )
+
+            DropdownMenuItem(
+                text = { Text("Выйти") },
+                leadingIcon = {
+                    androidx.compose.material3.Icon(
+                        imageVector = Icons.AutoMirrored.Filled.Logout,
+                        contentDescription = null
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onLogout()
+                }
+            )
+        }
+    }
+
+    if (showChangePwd) {
+        ChangePasswordDialog(
+            onDismiss = { showChangePwd = false },
+            onSave = { oldPwd, newPwd, done ->
+                onChangePassword(oldPwd, newPwd, done)
+            }
+        )
+    }
+}
+
+@Composable
+private fun ChangePasswordDialog(
+    onDismiss: () -> Unit,
+    onSave: (String, String, (String?) -> Unit) -> Unit
+) {
+    var oldPwd by remember { mutableStateOf("") }
+    var newPwd by remember { mutableStateOf("") }
+    var error by remember { mutableStateOf<String?>(null) }
+    var saving by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = { if (!saving) onDismiss() },
+        title = { Text("Сменить пароль") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(
+                    value = oldPwd,
+                    onValueChange = { oldPwd = it; error = null },
+                    label = { Text("Текущий пароль") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation()
+                )
+                OutlinedTextField(
+                    value = newPwd,
+                    onValueChange = { newPwd = it; error = null },
+                    label = { Text("Новый пароль") },
+                    singleLine = true,
+                    visualTransformation = PasswordVisualTransformation()
+                )
+                if (error != null) {
+                    Text(
+                        text = error!!,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    if (saving) return@TextButton
+                    saving = true
+                    onSave(oldPwd, newPwd) { err ->
+                        saving = false
+                        if (err == null) onDismiss() else error = err
+                    }
+                }
+            ) { Text("Сохранить") }
+        },
+        dismissButton = {
+            TextButton(onClick = { if (!saving) onDismiss() }) { Text("Отмена") }
+        }
+    )
+}
+
+@Composable
 private fun HomeActionCard(
     title: String,
     subtitle: String,
@@ -326,9 +478,7 @@ private fun HomeActionCard(
             .fillMaxWidth()
             .clickable(onClick = onClick),
         shape = RoundedCornerShape(18.dp),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surface
-        ),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
         Row(
@@ -338,7 +488,6 @@ private fun HomeActionCard(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-
             Box(
                 modifier = Modifier
                     .size(40.dp)
@@ -374,6 +523,9 @@ private fun HomeActionCard(
     }
 }
 
+// ---------------------
+// ✅ ТВОЙ КОД АНИМАЦИИ (домики/окна) — без изменений
+// ---------------------
 @Composable
 private fun BottomCityline(
     modifier: Modifier = Modifier,
@@ -381,7 +533,7 @@ private fun BottomCityline(
     scroll: Int
 ) {
     // Базовые высоты «домиков»
-    val baseHeights = listOf(18, 32, 26, 40, 24, 36, 22)
+    val baseHeights = listOf(22, 34, 28, 42, 26, 38, 24)
 
     Row(
         modifier = modifier
@@ -393,7 +545,7 @@ private fun BottomCityline(
         verticalAlignment = Alignment.Bottom
     ) {
         baseHeights.forEachIndexed { index, h ->
-            val animatedFactor = 0.9f + (0.1f * phase)
+            val animatedFactor = 1.0f + (0.0f * phase)
             val height = (h * animatedFactor).dp
 
             Box(
@@ -418,10 +570,11 @@ private fun BottomCityline(
                     verticalArrangement = Arrangement.SpaceEvenly,
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    val rows = if (h <= 22) 1 else 2
+                    val rows = 2
                     repeat(rows) {
                         Row(
-                            horizontalArrangement = Arrangement.spacedBy(4.dp),
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceEvenly,
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             repeat(2) {

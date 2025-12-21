@@ -17,6 +17,12 @@ interface UserDao {
 
     @Query("SELECT * FROM users WHERE id = :id LIMIT 1")
     suspend fun getById(id: String): UserEntity?
+
+    @Query("UPDATE users SET email = :email WHERE id = :id")
+    suspend fun updateEmail(id: String, email: String)
+
+    @Query("UPDATE users SET passwordHash = :passwordHash WHERE id = :id")
+    suspend fun updatePasswordHash(id: String, passwordHash: String)
 }
 
 // ---------- PROPERTIES ----------
@@ -98,7 +104,6 @@ interface AttachmentDao {
     @Query("SELECT * FROM attachments WHERE userId = :userId AND propertyId = :propertyId ORDER BY id DESC")
     fun observeForProperty(userId: String, propertyId: String): Flow<List<AttachmentEntity>>
 
-    // оставляем старый API (может быть где-то используется)
     @Query("SELECT * FROM attachments WHERE userId = :userId AND propertyId = :propertyId ORDER BY id DESC")
     suspend fun listForProperty(userId: String, propertyId: String): List<AttachmentEntity>
 

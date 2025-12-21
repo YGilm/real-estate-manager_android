@@ -84,6 +84,7 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-process:2.8.6")
+    implementation("androidx.biometric:biometric:1.1.0")
 
     // Навигация
     implementation("androidx.navigation:navigation-compose:2.8.3")

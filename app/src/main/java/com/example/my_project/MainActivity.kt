@@ -6,38 +6,49 @@ import androidx.activity.compose.setContent
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
-import com.example.my_project.auth.AuthRepository
+import androidx.lifecycle.lifecycleScope
 import com.example.my_project.auth.UserSession
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.runBlocking
+import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.launch
+import javax.inject.Inject
 
-
-@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
-
-    @Inject
-    lateinit var authRepo: AuthRepository
 
     @Inject
     lateinit var userSession: UserSession
 
     private val appLifecycleObserver = LifecycleEventObserver { _, event ->
-        if (event == Lifecycle.Event.ON_STOP) {
-            // автологаут при сворачивании, если "Запомнить меня" выключен
-            val remember = runBlocking { userSession.rememberFlow.first() }
-            if (!remember) {
-                runBlocking { authRepo.logout() }
+        when (event) {
+            Lifecycle.Event.ON_START -> {
+                // Приложение вернулось на передний план
+                lifecycleScope.launch {
+                    userSession.onAppForeground()
+                }
             }
+            Lifecycle.Event.ON_STOP -> {
+                // Приложение ушло в фон
+                lifecycleScope.launch {
+                    userSession.onAppBackground()
+                }
+            }
+            else -> Unit
         }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // На всякий случай сразу проверим TTL при старте
+        lifecycleScope.launch {
+            userSession.onAppForeground()
+        }
+
         ProcessLifecycleOwner.get().lifecycle.addObserver(appLifecycleObserver)
-        setContent { RealEstateApp() }
+
+        setContent {
+            RealEstateApp()
+        }
     }
 
     override fun onDestroy() {

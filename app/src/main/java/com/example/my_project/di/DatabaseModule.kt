@@ -24,31 +24,17 @@ object DatabaseModule {
     @Singleton
     fun provideDb(@ApplicationContext ctx: Context): AppDatabase =
         Room.databaseBuilder(ctx, AppDatabase::class.java, "real_estate.db")
-            // ❗️Важно: НЕ используем fallbackToDestructiveMigration(),
-            // чтобы не терять данные пользователей при обновлениях схемы.
             .addMigrations(
                 AppDatabase.MIGRATION_1_2,
                 AppDatabase.MIGRATION_2_3,
-                AppDatabase.MIGRATION_3_4,
-                AppDatabase.MIGRATION_4_5
+                AppDatabase.MIGRATION_3_4
             )
             .build()
 
-    @Provides
-    fun provideUserDao(db: AppDatabase): UserDao = db.userDao()
-
-    @Provides
-    fun providePropertyDao(db: AppDatabase): PropertyDao = db.propertyDao()
-
-    @Provides
-    fun provideTransactionDao(db: AppDatabase): TransactionDao = db.transactionDao()
-
-    @Provides
-    fun provideAttachmentDao(db: AppDatabase): AttachmentDao = db.attachmentDao()
-
-    @Provides
-    fun providePropertyDetailsDao(db: AppDatabase): PropertyDetailsDao = db.propertyDetailsDao()
-
-    @Provides
-    fun providePropertyPhotoDao(db: AppDatabase): PropertyPhotoDao = db.propertyPhotoDao()
+    @Provides fun provideUserDao(db: AppDatabase): UserDao = db.userDao()
+    @Provides fun providePropertyDao(db: AppDatabase): PropertyDao = db.propertyDao()
+    @Provides fun provideTransactionDao(db: AppDatabase): TransactionDao = db.transactionDao()
+    @Provides fun provideAttachmentDao(db: AppDatabase): AttachmentDao = db.attachmentDao()
+    @Provides fun providePropertyDetailsDao(db: AppDatabase): PropertyDetailsDao = db.propertyDetailsDao()
+    @Provides fun providePropertyPhotoDao(db: AppDatabase): PropertyPhotoDao = db.propertyPhotoDao()
 }

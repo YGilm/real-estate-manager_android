@@ -24,7 +24,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AttachFile
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.OpenInNew
+import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
@@ -306,7 +306,7 @@ fun EditTransactionDialog(
                                         if (uri != null) openAttachment(context, uri, attachmentMime)
                                     }
                                 ) {
-                                    Icon(Icons.Filled.OpenInNew, contentDescription = "Открыть файл")
+                                    Icon(Icons.AutoMirrored.Filled.OpenInNew, contentDescription = "Открыть файл")
                                 }
 
                                 Spacer(Modifier.width(14.dp))
