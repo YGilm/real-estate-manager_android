@@ -4,6 +4,7 @@ package com.example.my_project.ui.screens
 
 import android.content.Intent
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -11,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -18,11 +20,14 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PictureAsPdf
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenuItem
@@ -33,11 +38,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Tab
 import androidx.compose.material3.TabRow
+import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -53,6 +58,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -81,6 +87,7 @@ import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
+import kotlin.math.abs
 
 @Composable
 fun StatsScreen(
@@ -133,41 +140,54 @@ fun StatsScreen(
             )
         }
     ) { padding ->
-        Column(
-            Modifier
+        Box(
+            modifier = Modifier
                 .fillMaxSize()
-                .padding(padding)
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
         ) {
-            // ✅ Только строка фильтра — на всю ширину, прижата к верху
-            ObjectFilterRowFullWidth(
-                properties = properties,
-                selectedPropertyId = selectedPropertyId,
-                onSelected = { selectedPropertyId = it }
-            )
+            Column(
+                Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = 16.dp, vertical = 12.dp)
+            ) {
+                // ✅ Только строка фильтра — на всю ширину, прижата к верху
+                ObjectFilterRowFullWidth(
+                    properties = properties,
+                    selectedPropertyId = selectedPropertyId,
+                    onSelected = { selectedPropertyId = it }
+                )
 
-            Spacer(Modifier.height(8.dp))
+                Spacer(Modifier.height(8.dp))
 
-            StatsTabs(
-                selected = tab,
-                onSelect = { tab = it }
-            )
+                StatsTabs(
+                    selected = tab,
+                    onSelect = { tab = it }
+                )
 
-            Spacer(Modifier.height(10.dp))
+                Spacer(Modifier.height(10.dp))
 
-            // Контент вкладок занимает остаток и скроллится внутри
-            Box(Modifier.weight(1f)) {
-                when (tab) {
-                    0 -> MonthTabContent(txs = filteredTxs)
-                    1 -> YearTabContent(
-                        txs = filteredTxs,
-                        onOpenMonth = { y, m -> onOpenMonth(y, m, selectedPropertyId) }
-                    )
-                    2 -> PeriodTabContent(
-                        txs = filteredTxs,
-                        propertyName = selectedPropertyName,
-                        propertyAvatarUri = avatarUriForPdf
-                    )
+                // Контент вкладок занимает остаток и скроллится внутри
+                Box(Modifier.weight(1f)) {
+                    when (tab) {
+                        0 -> MonthTabContent(txs = filteredTxs)
+                        1 -> YearTabContent(
+                            txs = filteredTxs,
+                            onOpenMonth = { y, m -> onOpenMonth(y, m, selectedPropertyId) }
+                        )
+                        2 -> PeriodTabContent(
+                            txs = filteredTxs,
+                            propertyName = selectedPropertyName,
+                            propertyAvatarUri = avatarUriForPdf
+                        )
+                    }
                 }
             }
         }
@@ -183,20 +203,50 @@ private fun StatsTabs(
 ) {
     val labels = listOf("Месяц", "Год", "Период")
 
-    TabRow(selectedTabIndex = selected) {
-        labels.forEachIndexed { index, label ->
-            Tab(
-                selected = selected == index,
-                onClick = { onSelect(index) },
-                text = {
-                    Text(
-                        text = label,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        fontWeight = if (selected == index) FontWeight.SemiBold else FontWeight.Medium
-                    )
-                }
-            )
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+    ) {
+        TabRow(
+            selectedTabIndex = selected,
+            containerColor = Color.Transparent,
+            indicator = { tabPositions ->
+                Box(
+                    modifier = Modifier
+                        .tabIndicatorOffset(tabPositions[selected])
+                        .fillMaxHeight()
+                        .padding(4.dp)
+                        .background(
+                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                            shape = RoundedCornerShape(16.dp)
+                        )
+                )
+            },
+            divider = {}
+        ) {
+            labels.forEachIndexed { index, label ->
+                val isSelected = selected == index
+                Tab(
+                    selected = isSelected,
+                    onClick = { onSelect(index) },
+                    text = {
+                        Text(
+                            text = label,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Medium,
+                            color = if (isSelected)
+                                MaterialTheme.colorScheme.onSurface
+                            else
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                )
+            }
         }
     }
 }
@@ -372,7 +422,14 @@ private fun PeriodTabContent(
         }
 
         item {
-            OutlinedCard(Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
                 Column(
                     Modifier.padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -503,7 +560,14 @@ private fun PeriodTabContent(
             }
         }
 
-        item { TotalsBlock(totals) }
+        item {
+            val showAvg = fromSelected && months >= 2
+            TotalsBlock(
+                t = totals,
+                avgNetLabel = if (showAvg) "Средняя за месяц:" else null,
+                avgNetValue = if (showAvg) avgNet else null
+            )
+        }
     }
 }
 
@@ -578,8 +642,13 @@ private fun MonthTabContent(txs: List<Transaction>) {
             }
         }
 
-        item { Text("Месяц: ${monthName(selectedMonth)} $selectedYear", fontWeight = FontWeight.SemiBold) }
-        item { TotalsBlock(totals) }
+        item {
+            TotalsBlock(
+                t = totals,
+                avgNetLabel = null,
+                avgNetValue = null
+            )
+        }
         item { Text("Транзакции", style = MaterialTheme.typography.titleMedium) }
 
         if (monthTxs.isEmpty()) {
@@ -587,7 +656,14 @@ private fun MonthTabContent(txs: List<Transaction>) {
         } else {
             itemsIndexed(monthTxs) { _, t ->
                 val isFuture = t.date.isAfter(LocalDate.now())
-                OutlinedCard(Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+                ) {
                     Column(Modifier.padding(12.dp)) {
                         Text(
                             text = if (t.type == TxType.INCOME) "Доход" else "Расход",
@@ -658,14 +734,25 @@ private fun YearTabContent(
             )
         }
 
-        item { TotalsBlock(yearTotals) }
+        item {
+            TotalsBlock(
+                t = yearTotals,
+                avgNetLabel = null,
+                avgNetValue = null
+            )
+        }
         item { Text("По месяцам", style = MaterialTheme.typography.titleMedium) }
 
         items(byMonth) { row ->
-            OutlinedCard(
-                Modifier
+            Card(
+                modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { onOpenMonth(selectedYear, row.month) }
+                    .clickable { onOpenMonth(selectedYear, row.month) },
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
                 Column(Modifier.padding(12.dp)) {
                     Text(monthName(row.month), fontWeight = FontWeight.SemiBold)
@@ -726,11 +813,27 @@ private fun SimpleDropdown(
 /* ===================== Общие UI-компоненты денег ===================== */
 
 @Composable
-private fun TotalsBlock(t: Totals) {
-    Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        MoneyLineLabel("Доход:", TxType.INCOME, t.income)
-        MoneyLineLabel("Расход:", TxType.EXPENSE, t.expense)
-        MoneyLineTotal("Итого:", t.total)
+private fun TotalsBlock(
+    t: Totals,
+    avgNetLabel: String?,
+    avgNetValue: Double?
+) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+    ) {
+        Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            MoneyLineLabel("Доход:", TxType.INCOME, t.income)
+            MoneyLineLabel("Расход:", TxType.EXPENSE, t.expense)
+            if (avgNetLabel != null && avgNetValue != null) {
+                MoneyLineAverage(avgNetLabel, avgNetValue)
+            }
+            MoneyLineTotal("Итого:", t.total)
+        }
     }
 }
 
@@ -752,7 +855,11 @@ private fun MonthTxMoneyLine(
 
 @Composable
 private fun MoneyLineLabel(label: String, type: TxType, amount: Double) {
-    val text = moneyFormat(amount, type)
+    val text = if (type == TxType.EXPENSE && amount == 0.0) {
+        moneyFormatPlain(amount)
+    } else {
+        moneyFormat(amount, type)
+    }
     val color = if (type == TxType.INCOME) Color(0xFF2E7D32) else Color(0xFFC62828)
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label)
@@ -766,5 +873,24 @@ private fun MoneyLineTotal(label: String, amount: Double) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, fontWeight = FontWeight.SemiBold)
         Text(text, fontWeight = FontWeight.SemiBold)
+    }
+}
+
+@Composable
+private fun MoneyLineAverage(label: String, amount: Double) {
+    val text = if (amount < 0) {
+        "-${moneyFormatPlain(abs(amount))}"
+    } else {
+        moneyFormatPlain(amount)
+    }
+    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        Text(
+            text,
+            color = MaterialTheme.colorScheme.primary,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
     }
 }

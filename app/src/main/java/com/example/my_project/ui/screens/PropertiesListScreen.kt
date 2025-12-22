@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.outlined.Apartment
@@ -14,6 +15,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -70,28 +72,38 @@ fun PropertiesListScreen(
             }
         }
     ) { inner ->
-        if (properties.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .padding(inner)
-                    .fillMaxSize(),
-                contentAlignment = Alignment.Center
-            ) {
-                Text("Пока нет объектов")
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .padding(inner)
-                    .fillMaxSize(),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                items(properties, key = { it.id }) { property ->
-                    PropertyListItem(
-                        property = property,
-                        onClick = { onOpen(property.id) }
+        Box(
+            modifier = Modifier
+                .padding(inner)
+                .fillMaxSize()
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                            MaterialTheme.colorScheme.background
+                        )
                     )
+                )
+        ) {
+            if (properties.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Пока нет объектов")
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    items(properties, key = { it.id }) { property ->
+                        PropertyListItem(
+                            property = property,
+                            onClick = { onOpen(property.id) }
+                        )
+                    }
                 }
             }
         }
@@ -105,7 +117,12 @@ private fun PropertyListItem(
 ) {
     Card(
         modifier = Modifier.fillMaxWidth(),
-        onClick = onClick
+        onClick = onClick,
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
             modifier = Modifier
@@ -128,15 +145,15 @@ private fun PropertyListItem(
                     overflow = TextOverflow.Ellipsis
                 )
 
-                property.address?.takeIf { it.isNotBlank() }?.let { addr ->
-                    Text(
-                        text = addr,
-                        style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 2,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
+                val addressText = property.address?.takeIf { it.isNotBlank() }.orEmpty()
+                Text(
+                    text = addressText,
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 2,
+                    minLines = 2,
+                    overflow = TextOverflow.Ellipsis
+                )
 
                 buildLeaseText(property.leaseFrom, property.leaseTo)?.let { leaseText ->
                     Text(
