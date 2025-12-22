@@ -36,6 +36,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -53,6 +54,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.my_project.data.model.TxType
 import com.example.my_project.ui.RealEstateViewModel
+import com.example.my_project.ui.util.copyUriToAppStorage
+import android.net.Uri
 import java.time.LocalDate
 import java.util.Locale
 
@@ -69,6 +72,19 @@ fun PropertyDetailsScreen(
 ) {
     val properties by vm.properties.collectAsState()
     val property = properties.firstOrNull { it.id == propertyId }
+    val context = LocalContext.current
+
+    LaunchedEffect(property?.coverUri) {
+        val uri = property?.coverUri ?: return@LaunchedEffect
+        if (uri.startsWith("content://")) {
+            val newUri = runCatching {
+                copyUriToAppStorage(context, Uri.parse(uri), "covers")
+            }.getOrNull()
+            if (!newUri.isNullOrBlank() && newUri != uri) {
+                vm.setCover(propertyId, newUri)
+            }
+        }
+    }
 
     val allTxs by vm.transactions.collectAsState()
     val today = remember { LocalDate.now() }

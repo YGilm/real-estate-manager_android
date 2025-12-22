@@ -22,6 +22,8 @@ import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.my_project.data.model.Property
 import com.example.my_project.ui.RealEstateViewModel
+import com.example.my_project.ui.util.copyUriToAppStorage
+import android.net.Uri
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -32,6 +34,21 @@ fun PropertiesListScreen(
     onBack: () -> Unit
 ) {
     val properties by vm.properties.collectAsState()
+    val context = LocalContext.current
+
+    LaunchedEffect(properties) {
+        properties.forEach { property ->
+            val uri = property.coverUri ?: return@forEach
+            if (uri.startsWith("content://")) {
+                val newUri = runCatching {
+                    copyUriToAppStorage(context, Uri.parse(uri), "covers")
+                }.getOrNull()
+                if (!newUri.isNullOrBlank() && newUri != uri) {
+                    vm.setCover(property.id, newUri)
+                }
+            }
+        }
+    }
 
     Scaffold(
         topBar = {

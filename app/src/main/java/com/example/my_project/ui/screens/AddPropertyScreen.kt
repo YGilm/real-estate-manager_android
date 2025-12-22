@@ -46,6 +46,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.my_project.ui.util.copyUriToAppStorage
 
 @Composable
 fun AddPropertyScreen(
@@ -79,7 +80,7 @@ fun AddPropertyScreen(
             } catch (e: SecurityException) {
                 // Если не дали persistable — всё равно используем строку, пока процесс жив
             }
-            coverUri = uri.toString()
+            coverUri = copyUriToAppStorage(context, uri, "covers") ?: uri.toString()
         }
     }
 

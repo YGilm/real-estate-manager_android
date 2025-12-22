@@ -176,6 +176,13 @@ class RealEstateViewModel @Inject constructor(
         }
     }
 
+    fun updatePropertyPhotoUri(photoId: String, uri: String) {
+        val uid = userIdFlow.value ?: return
+        viewModelScope.launch {
+            repo.updatePropertyPhotoUri(uid, photoId, uri)
+        }
+    }
+
     fun reorderPropertyPhotos(propertyId: String, orderedIds: List<String>) {
         val uid = userIdFlow.value ?: return
         viewModelScope.launch {

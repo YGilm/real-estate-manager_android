@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
 import com.example.my_project.ui.RealEstateViewModel
+import com.example.my_project.ui.util.copyUriToAppStorage
 import kotlinx.coroutines.launch
 
 @Composable
@@ -104,7 +105,7 @@ fun EditPropertyScreen(
             } catch (_: SecurityException) {
             }
 
-            val uriString = uri.toString()
+            val uriString = copyUriToAppStorage(context, uri, "covers") ?: uri.toString()
             coverUri = uriString
             vm.setCover(propertyId, uriString)
         }

@@ -29,6 +29,8 @@ data class SessionState(
 class UserSession @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    internal var nowProvider: () -> Long = { System.currentTimeMillis() }
+
     private val KEY_USER_ID = stringPreferencesKey("user_id")
     private val KEY_REMEMBER = booleanPreferencesKey("remember_me")
     private val KEY_LOCKED = booleanPreferencesKey("locked")
@@ -67,7 +69,7 @@ class UserSession @Inject constructor(
     }
 
     suspend fun signIn(userId: String, remember: Boolean) {
-        val now = System.currentTimeMillis()
+        val now = nowProvider()
         context.dataStore.edit { prefs ->
             prefs[KEY_USER_ID] = userId
             prefs[KEY_REMEMBER] = remember
@@ -92,7 +94,7 @@ class UserSession @Inject constructor(
      * Мы фиксируем "окно" активности на 15 минут.
      */
     suspend fun onAppBackground() {
-        val now = System.currentTimeMillis()
+        val now = nowProvider()
         context.dataStore.edit { prefs ->
             val uid = prefs[KEY_USER_ID]
             if (uid.isNullOrBlank()) return@edit
@@ -108,7 +110,7 @@ class UserSession @Inject constructor(
      *  - remember=true  -> lock (пользователь сохранён, но нужно разблокировать)
      */
     suspend fun onAppForeground() {
-        val now = System.currentTimeMillis()
+        val now = nowProvider()
         context.dataStore.edit { prefs ->
             val uid = prefs[KEY_USER_ID]
             if (uid.isNullOrBlank()) return@edit
@@ -141,7 +143,7 @@ class UserSession @Inject constructor(
      * Снимаем lock и продляем TTL.
      */
     suspend fun unlockAndExtend() {
-        val now = System.currentTimeMillis()
+        val now = nowProvider()
         context.dataStore.edit { prefs ->
             val uid = prefs[KEY_USER_ID]
             if (uid.isNullOrBlank()) return@edit

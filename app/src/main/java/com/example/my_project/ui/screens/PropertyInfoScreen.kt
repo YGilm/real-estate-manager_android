@@ -69,13 +69,17 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import android.content.Context
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
+import com.example.my_project.data.model.Attachment
 import com.example.my_project.data.model.PropertyPhoto
 import com.example.my_project.ui.RealEstateViewModel
+import com.example.my_project.ui.util.copyUriToAppStorage
 import kotlinx.coroutines.launch
 import java.util.Locale
 import kotlin.math.roundToInt
+import android.provider.OpenableColumns
 
 /**
  * Экран подробной информации об объекте:
@@ -116,6 +120,20 @@ fun PropertyInfoScreen(
     // ---------- Просмотр фото (диалог-пейджер) ----------
     var photoViewerOpen by remember { mutableStateOf(false) }
     var photoViewerIndex by remember { mutableStateOf(0) }
+
+    LaunchedEffect(photos) {
+        photos.forEach { photo ->
+            val uri = photo.uri
+            if (uri.startsWith("content://")) {
+                val newUri = runCatching {
+                    copyUriToAppStorage(context, Uri.parse(uri), "property_photos")
+                }.getOrNull()
+                if (!newUri.isNullOrBlank() && newUri != uri) {
+                    vm.updatePropertyPhotoUri(photo.id, newUri)
+                }
+            }
+        }
+    }
 
     if (photoViewerOpen && photos.isNotEmpty()) {
         AlertDialog(
@@ -191,7 +209,10 @@ fun PropertyInfoScreen(
                     // игнорируем, если уже есть пермишен
                 }
             }
-            vm.addPropertyPhotos(propertyId, uris.map { it.toString() })
+            val storedUris = uris.map { uri ->
+                copyUriToAppStorage(context, uri, "property_photos") ?: uri.toString()
+            }
+            vm.addPropertyPhotos(propertyId, storedUris)
         }
     )
 
@@ -200,18 +221,34 @@ fun PropertyInfoScreen(
     var pendingDocName by rememberSaveable { mutableStateOf("") }
 
     val docPicker = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.OpenDocument(),
-        onResult = { uri ->
-            if (!isEditing || uri == null) return@rememberLauncherForActivityResult
-            try {
-                context.contentResolver.takePersistableUriPermission(
-                    uri,
-                    Intent.FLAG_GRANT_READ_URI_PERMISSION
-                )
-            } catch (_: SecurityException) {
+        contract = ActivityResultContracts.OpenMultipleDocuments(),
+        onResult = { uris ->
+            if (!isEditing || uris.isNullOrEmpty()) return@rememberLauncherForActivityResult
+            if (uris.size == 1) {
+                val uri = uris.first()
+                try {
+                    context.contentResolver.takePersistableUriPermission(
+                        uri,
+                        Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    )
+                } catch (_: SecurityException) {
+                }
+                pendingDocUri = uri
+                pendingDocName = ""
+            } else {
+                uris.forEach { uri ->
+                    try {
+                        context.contentResolver.takePersistableUriPermission(
+                            uri,
+                            Intent.FLAG_GRANT_READ_URI_PERMISSION
+                        )
+                    } catch (_: SecurityException) {
+                    }
+                    val name = queryDisplayName(context, uri)?.trim().orEmpty().ifBlank { "Документ" }
+                    val mime = context.contentResolver.getType(uri)
+                    vm.addAttachment(propertyId, name, mime, uri.toString())
+                }
             }
-            pendingDocUri = uri
-            pendingDocName = ""
         }
     )
 
@@ -287,6 +324,33 @@ fun PropertyInfoScreen(
             },
             dismissButton = {
                 TextButton(onClick = { photoToDeleteId = null }) {
+                    Text("Отмена")
+                }
+            }
+        )
+    }
+
+    // ---------- Подтверждение удаления документа ----------
+    var docToDelete by remember(propertyId) { mutableStateOf<Attachment?>(null) }
+
+    if (docToDelete != null) {
+        AlertDialog(
+            onDismissRequest = { docToDelete = null },
+            title = { Text("Удалить документ?") },
+            text = { Text("Документ будет удалён без возможности восстановления.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        val doc = docToDelete
+                        if (doc != null) {
+                            vm.deleteAttachment(doc.id)
+                        }
+                        docToDelete = null
+                    }
+                ) { Text("Удалить", color = Color(0xFFD32F2F)) }
+            },
+            dismissButton = {
+                TextButton(onClick = { docToDelete = null }) {
                     Text("Отмена")
                 }
             }
@@ -641,7 +705,7 @@ fun PropertyInfoScreen(
                                 name = a.name,
                                 mimeType = a.mimeType,
                                 onOpen = { openAttachment(context, a.uri, a.mimeType) },
-                                onDelete = if (isEditing) ({ vm.deleteAttachment(a.id) }) else null
+                                onDelete = if (isEditing) ({ docToDelete = a }) else null
                             )
                             Spacer(Modifier.height(8.dp))
                         }
@@ -674,6 +738,16 @@ private fun KeyValueRow(label: String, value: String) {
         Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant)
         Text(value, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
+}
+
+private fun queryDisplayName(context: Context, uri: Uri): String? {
+    val projection = arrayOf(OpenableColumns.DISPLAY_NAME)
+    return runCatching {
+        context.contentResolver.query(uri, projection, null, null, null)?.use { c ->
+            val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
+            if (idx >= 0 && c.moveToFirst()) c.getString(idx) else null
+        }
+    }.getOrNull()
 }
 
 /**

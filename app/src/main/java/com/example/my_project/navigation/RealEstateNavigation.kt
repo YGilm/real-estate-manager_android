@@ -18,6 +18,7 @@ import com.example.my_project.ui.RealEstateViewModel
 import com.example.my_project.ui.screens.AddPropertyScreen
 import com.example.my_project.ui.screens.EditPropertyScreen
 import com.example.my_project.ui.screens.HomeScreen
+import com.example.my_project.ui.screens.LockScreen
 import com.example.my_project.ui.screens.PropertiesListScreen
 import com.example.my_project.ui.screens.PropertyDetailsScreen
 import com.example.my_project.ui.screens.PropertyInfoScreen
@@ -33,6 +34,7 @@ sealed class Destination(val route: String) {
 
     data object SignIn : Destination("auth/signin")
     data object SignUp : Destination("auth/signup")
+    data object Lock : Destination("auth/lock")
 
     data object Home : Destination("home")
     data object Properties : Destination("properties")
@@ -108,10 +110,15 @@ fun RealEstateNavigation() {
     ) {
 
         composable(Destination.Gate.route) {
-            LaunchedEffect(sessionState.userId) {
+            LaunchedEffect(sessionState.userId, sessionState.locked) {
                 val startId = navController.graph.findStartDestination().id
                 if (sessionState.userId == null) {
                     navController.navigate(Destination.SignIn.route) {
+                        popUpTo(startId) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                } else if (sessionState.locked) {
+                    navController.navigate(Destination.Lock.route) {
                         popUpTo(startId) { inclusive = true }
                         launchSingleTop = true
                     }
@@ -127,6 +134,16 @@ fun RealEstateNavigation() {
         // -------- AUTH --------
 
         composable(Destination.SignIn.route) {
+            LaunchedEffect(sessionState.userId, sessionState.locked) {
+                if (sessionState.userId != null) {
+                    val startId = navController.graph.findStartDestination().id
+                    val route = if (sessionState.locked) Destination.Lock.route else Destination.Home.route
+                    navController.navigate(route) {
+                        popUpTo(startId) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            }
             SignInScreen(
                 onSignIn = { email, pass, remember, onDone ->
                     authVm.login(email, pass, remember) { err ->
@@ -159,6 +176,41 @@ fun RealEstateNavigation() {
                     }
                 },
                 onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(Destination.Lock.route) {
+            val email by authVm.currentEmail.collectAsState()
+            LockScreen(
+                email = email,
+                onUnlockByBiometricSuccess = {
+                    authVm.unlockByBiometricSuccess()
+                    val startId = navController.graph.findStartDestination().id
+                    navController.navigate(Destination.Home.route) {
+                        popUpTo(startId) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                },
+                onUnlockByPassword = { pass, onDone ->
+                    authVm.unlockByPassword(pass) { err ->
+                        onDone(err)
+                        if (err == null) {
+                            val startId = navController.graph.findStartDestination().id
+                            navController.navigate(Destination.Home.route) {
+                                popUpTo(startId) { inclusive = true }
+                                launchSingleTop = true
+                            }
+                        }
+                    }
+                },
+                onLogout = {
+                    authVm.logout()
+                    val startId = navController.graph.findStartDestination().id
+                    navController.navigate(Destination.SignIn.route) {
+                        popUpTo(startId) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
             )
         }
 

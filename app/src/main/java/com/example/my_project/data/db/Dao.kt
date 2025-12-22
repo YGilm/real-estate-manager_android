@@ -72,6 +72,9 @@ interface PropertyPhotoDao {
     @Query("DELETE FROM property_photos WHERE userId = :userId AND id = :id")
     suspend fun delete(userId: String, id: String)
 
+    @Query("UPDATE property_photos SET uri = :uri WHERE userId = :userId AND id = :id")
+    suspend fun updateUri(userId: String, id: String, uri: String)
+
     @Query("DELETE FROM property_photos WHERE userId = :userId AND propertyId = :propertyId")
     suspend fun deleteForProperty(userId: String, propertyId: String)
 }

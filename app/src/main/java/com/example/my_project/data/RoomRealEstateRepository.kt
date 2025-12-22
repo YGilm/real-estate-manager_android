@@ -152,6 +152,11 @@ class RoomRealEstateRepository @Inject constructor(
             propertyPhotoDao.delete(userId, photoId)
         }
 
+    override suspend fun updatePropertyPhotoUri(userId: String, photoId: String, uri: String) =
+        withContext(Dispatchers.IO) {
+            propertyPhotoDao.updateUri(userId, photoId, uri)
+        }
+
     override suspend fun reorderPropertyPhotos(
         userId: String,
         propertyId: String,
