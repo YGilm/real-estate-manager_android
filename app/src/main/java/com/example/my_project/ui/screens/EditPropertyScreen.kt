@@ -10,15 +10,18 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -27,6 +30,8 @@ import androidx.compose.material.icons.outlined.Apartment
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,6 +53,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
@@ -167,7 +173,15 @@ fun EditPropertyScreen(
             Box(
                 modifier = Modifier
                     .padding(inner)
-                    .fillMaxSize(),
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                                MaterialTheme.colorScheme.background
+                            )
+                        )
+                    ),
                 contentAlignment = Alignment.Center
             ) {
                 CircularProgressIndicator()
@@ -177,11 +191,20 @@ fun EditPropertyScreen(
                 modifier = Modifier
                     .padding(inner)
                     .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                                MaterialTheme.colorScheme.background
+                            )
+                        )
+                    )
             ) {
                 Column(
                     modifier = Modifier
                         .fillMaxSize()
-                        .padding(16.dp),
+                        .padding(16.dp)
+                        .padding(bottom = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     // Прокручиваемая часть
@@ -189,69 +212,96 @@ fun EditPropertyScreen(
                         modifier = Modifier
                             .weight(1f)
                             .fillMaxWidth()
-                            .verticalScroll(rememberScrollState()),
+                            .verticalScroll(rememberScrollState())
+                            .padding(bottom = 12.dp),
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
-                        // Аватар / обложка
-                        Column(
+                        Card(
                             modifier = Modifier.fillMaxWidth(),
-                            horizontalAlignment = Alignment.CenterHorizontally
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
                         ) {
-                            EditPropertyAvatar(coverUri = coverUri)
-                            Spacer(modifier = Modifier.height(8.dp))
-                            TextButton(
-                                onClick = {
-                                    pickImageLauncher.launch(arrayOf("image/*"))
-                                }
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
                             ) {
-                                Text(
-                                    "Изменить фото",
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
+                                EditPropertyAvatar(coverUri = coverUri)
+                                TextButton(
+                                    onClick = {
+                                        pickImageLauncher.launch(arrayOf("image/*"))
+                                    }
+                                ) {
+                                    Text(
+                                        "Изменить фото",
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis
+                                    )
+                                }
                             }
                         }
 
-                        OutlinedTextField(
-                            value = name,
-                            onValueChange = { name = it },
-                            label = { Text("Название объекта") },
+                        Card(
                             modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
+                            shape = RoundedCornerShape(20.dp),
+                            colors = CardDefaults.cardColors(
+                                containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                            ),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(16.dp),
+                                verticalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                OutlinedTextField(
+                                    value = name,
+                                    onValueChange = { name = it },
+                                    label = { Text("Название объекта") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true
+                                )
 
-                        OutlinedTextField(
-                            value = address,
-                            onValueChange = { address = it },
-                            label = { Text("Адрес объекта") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
+                                OutlinedTextField(
+                                    value = address,
+                                    onValueChange = { address = it },
+                                    label = { Text("Адрес объекта") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true
+                                )
 
-                        OutlinedTextField(
-                            value = rentText,
-                            onValueChange = { rentText = it },
-                            label = { Text("Арендная плата в месяц") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
+                                OutlinedTextField(
+                                    value = rentText,
+                                    onValueChange = { rentText = it },
+                                    label = { Text("Арендная плата в месяц") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true
+                                )
 
-                        OutlinedTextField(
-                            value = leaseFromText,
-                            onValueChange = { leaseFromText = it },
-                            label = { Text("Договор аренды: с (дата)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
+                                OutlinedTextField(
+                                    value = leaseFromText,
+                                    onValueChange = { leaseFromText = it },
+                                    label = { Text("Договор аренды: с (дата)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true
+                                )
 
-                        OutlinedTextField(
-                            value = leaseToText,
-                            onValueChange = { leaseToText = it },
-                            label = { Text("Договор аренды: по (дата)") },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true
-                        )
+                                OutlinedTextField(
+                                    value = leaseToText,
+                                    onValueChange = { leaseToText = it },
+                                    label = { Text("Договор аренды: по (дата)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true
+                                )
+                            }
+                        }
                     }
+
+                    Spacer(Modifier.height(20.dp))
 
                     // Низ: три одинаковые по ширине кнопки в один ряд
                     Row(
@@ -263,12 +313,15 @@ fun EditPropertyScreen(
                         // Удалить — только иконка, красная
                         Button(
                             onClick = { showDeleteDialog = true },
-                            modifier = Modifier.weight(1f),
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 36.dp),
                             enabled = !isSaving,
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = MaterialTheme.colorScheme.error,
                                 contentColor = MaterialTheme.colorScheme.onError
                             ),
+                            contentPadding = PaddingValues(vertical = 2.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Delete,
@@ -279,8 +332,11 @@ fun EditPropertyScreen(
                         // Отмена — обводка
                         OutlinedButton(
                             onClick = onBack,
-                            modifier = Modifier.weight(1f),
-                            enabled = !isSaving
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 36.dp),
+                            enabled = !isSaving,
+                            contentPadding = PaddingValues(vertical = 2.dp)
                         ) {
                             Text(
                                 "Отмена",
@@ -307,8 +363,11 @@ fun EditPropertyScreen(
                                     onBack()
                                 }
                             },
-                            modifier = Modifier.weight(1f),
-                            enabled = !isSaving
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 36.dp),
+                            enabled = !isSaving,
+                            contentPadding = PaddingValues(vertical = 2.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.Check,
@@ -331,7 +390,7 @@ private fun EditPropertyAvatar(
 
     Box(
         modifier = modifier
-            .size(96.dp)
+            .size(120.dp)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.surfaceVariant),
         contentAlignment = Alignment.Center
@@ -340,7 +399,8 @@ private fun EditPropertyAvatar(
         Icon(
             imageVector = Icons.Outlined.Apartment,
             contentDescription = null,
-            tint = MaterialTheme.colorScheme.onSurfaceVariant
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.size(40.dp)
         )
 
         // Если есть картинка — рисуем её поверх

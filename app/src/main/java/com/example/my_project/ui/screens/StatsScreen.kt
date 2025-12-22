@@ -9,6 +9,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -157,6 +158,7 @@ fun StatsScreen(
                     .fillMaxSize()
                     .padding(padding)
                     .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .padding(bottom = 16.dp)
             ) {
                 // ✅ Только строка фильтра — на всю ширину, прижата к верху
                 ObjectFilterRowFullWidth(
@@ -411,7 +413,8 @@ private fun PeriodTabContent(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = 12.dp)
     ) {
         item {
             Text(
@@ -615,7 +618,8 @@ private fun MonthTabContent(txs: List<Transaction>) {
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = 12.dp)
     ) {
         item {
             Row(
@@ -722,7 +726,8 @@ private fun YearTabContent(
 
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp),
+        contentPadding = PaddingValues(bottom = 12.dp)
     ) {
         item {
             SimpleDropdown(

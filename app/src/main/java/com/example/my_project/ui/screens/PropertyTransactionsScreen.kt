@@ -6,6 +6,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.widget.Toast
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -25,6 +26,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.automirrored.filled.OpenInNew
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
@@ -35,7 +37,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -49,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -123,6 +125,14 @@ fun PropertyTransactionsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
                 .padding(horizontal = 16.dp, vertical = 12.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
@@ -262,7 +272,14 @@ private fun TransactionDetailsSheet(
                 }
             }
 
-            OutlinedCard(Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
                 Column(
                     modifier = Modifier.padding(12.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -302,7 +319,14 @@ private fun TransactionDetailsSheet(
 
             if (!transaction.attachmentUri.isNullOrBlank()) {
                 val shownName = transaction.attachmentName ?: "Вложение"
-                OutlinedCard(Modifier.fillMaxWidth()) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
                     Column(
                         modifier = Modifier.padding(12.dp),
                         verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -404,7 +428,11 @@ private fun TransactionRow(
         modifier = modifier
             .fillMaxWidth()
             .padding(vertical = 2.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 4.dp),
         onClick = onClick
     ) {
         Column(

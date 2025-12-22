@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
@@ -25,8 +26,9 @@ import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.outlined.Apartment
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedButton
-import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -45,6 +47,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -99,6 +102,7 @@ fun PropertyDetailsScreen(
     val income = yearTransactions.filter { it.type == TxType.INCOME }.sumOf { it.amount }
     val expense = yearTransactions.filter { it.type == TxType.EXPENSE }.sumOf { it.amount }
     val total = income - expense
+    val monthsWithTx = yearTransactions.map { it.date.monthValue }.distinct().size
 
     var featureStubMessage by remember { mutableStateOf<String?>(null) }
 
@@ -145,45 +149,63 @@ fun PropertyDetailsScreen(
             )
         }
     ) { padding ->
-
-        Column(
+        Box(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
-        ) {
-
-            ElevatedCard(Modifier.fillMaxWidth()) {
-                Column(
-                    Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-
-                        PropertyAvatar(
-                            coverUri = property?.coverUri
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                            MaterialTheme.colorScheme.background
                         )
+                    )
+                )
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
 
-                        Spacer(Modifier.size(12.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
+                    Column(
+                        Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
 
-                        Column(Modifier.weight(1f)) {
-                            Text(
-                                text = property?.name ?: "Без названия",
-                                style = MaterialTheme.typography.titleMedium,
-                                fontWeight = FontWeight.SemiBold
+                            PropertyAvatar(
+                                coverUri = property?.coverUri
                             )
-                            if (!property?.address.isNullOrBlank()) {
+
+                            Spacer(Modifier.size(12.dp))
+
+                            Column(Modifier.weight(1f)) {
                                 Text(
-                                    text = property?.address.orEmpty(),
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    text = property?.name ?: "Без названия",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
                                 )
+                                if (!property?.address.isNullOrBlank()) {
+                                    Text(
+                                        text = property?.address.orEmpty(),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
 
             // Кнопки действий
             Row(
@@ -241,7 +263,14 @@ fun PropertyDetailsScreen(
             }
 
             // Статистика за год
-            ElevatedCard(Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
                 Column(
                     Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -278,6 +307,19 @@ fun PropertyDetailsScreen(
                         )
                     }
 
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text("Средняя чистая прибыль/мес", maxLines = 1)
+                        Text(
+                            text = moneyFormatPlain(if (monthsWithTx > 0) total / monthsWithTx else 0.0),
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold,
+                            maxLines = 1
+                        )
+                    }
+
                     HorizontalDivider()
 
                     Row(
@@ -300,6 +342,7 @@ fun PropertyDetailsScreen(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
+            }
             }
         }
     }

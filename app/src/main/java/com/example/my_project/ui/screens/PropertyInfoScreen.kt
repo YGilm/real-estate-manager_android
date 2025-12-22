@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.layout.Arrangement
@@ -25,6 +26,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
@@ -38,7 +40,8 @@ import androidx.compose.material.icons.filled.Pets
 import androidx.compose.material.icons.filled.ZoomIn
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
-import androidx.compose.material3.ElevatedCard
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -60,6 +63,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
@@ -394,17 +398,36 @@ fun PropertyInfoScreen(
             )
         }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .padding(padding)
                 .fillMaxSize()
-                .verticalScroll(rememberScrollState())
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                            MaterialTheme.colorScheme.background
+                        )
+                    )
+                )
         ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .verticalScroll(rememberScrollState())
+                    .padding(16.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
 
             // Паспорт объекта
-            ElevatedCard(Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
                 Column(
                     Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp)
@@ -451,7 +474,14 @@ fun PropertyInfoScreen(
             }
 
             // Описание
-            ElevatedCard(Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
                 Column(
                     Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -474,7 +504,14 @@ fun PropertyInfoScreen(
             }
 
             // Метраж
-            ElevatedCard(Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
                 Column(
                     Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(10.dp)
@@ -507,7 +544,14 @@ fun PropertyInfoScreen(
             }
 
             // Фото
-            ElevatedCard(Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
                 Column(
                     Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -669,7 +713,14 @@ fun PropertyInfoScreen(
             }
 
             // Документы
-            ElevatedCard(Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
                 Column(
                     Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -714,7 +765,14 @@ fun PropertyInfoScreen(
             }
 
             // Арендатор (пока заглушка)
-            ElevatedCard(Modifier.fillMaxWidth()) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
                 Column(
                     Modifier.padding(16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
@@ -724,6 +782,7 @@ fun PropertyInfoScreen(
                         Text("Открыть арендатора")
                     }
                 }
+            }
             }
         }
     }

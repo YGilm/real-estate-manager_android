@@ -3,11 +3,14 @@ package com.example.my_project.ui.screens
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
@@ -62,68 +65,98 @@ fun LockScreen(
         prompt.authenticate(info)
     }
 
-    Column(
-        modifier = Modifier.fillMaxSize().padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        Text("Приложение заблокировано", style = MaterialTheme.typography.titleLarge)
-
-        if (!email.isNullOrBlank()) {
-            Text("Аккаунт: $email", style = MaterialTheme.typography.bodyMedium)
-        }
-
-        if (error != null) {
-            Text(error!!, color = MaterialTheme.colorScheme.error)
-        }
-
-        if (!showPassword) {
-            Button(
-                onClick = {
-                    error = null
-                    if (biometricAvailable) startBiometric() else showPassword = true
-                },
-                modifier = Modifier.fillMaxWidth(0.78f)
-            ) {
-                Text(if (biometricAvailable) "Разблокировать" else "Ввести пароль")
-            }
-
-            if (biometricAvailable) {
-                OutlinedButton(
-                    onClick = { error = null; showPassword = true },
-                    modifier = Modifier.fillMaxWidth(0.78f)
-                ) { Text("Ввести пароль") }
-            }
-        }
-
-        AnimatedVisibility(visible = showPassword) {
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                OutlinedTextField(
-                    value = pass,
-                    onValueChange = { pass = it; error = null },
-                    label = { Text("Пароль") },
-                    singleLine = true,
-                    visualTransformation = PasswordVisualTransformation(),
-                    modifier = Modifier.fillMaxWidth()
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        MaterialTheme.colorScheme.primary.copy(alpha = 0.18f),
+                        MaterialTheme.colorScheme.background
+                    )
                 )
+            )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+            ) {
+                Column(
+                    modifier = Modifier.padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Text("Приложение заблокировано", style = MaterialTheme.typography.titleLarge)
 
-                Button(
-                    onClick = { onUnlockByPassword(pass) { msg -> error = msg } },
-                    modifier = Modifier.fillMaxWidth(0.78f)
-                ) { Text("Подтвердить") }
+                    if (!email.isNullOrBlank()) {
+                        Text("Аккаунт: $email", style = MaterialTheme.typography.bodyMedium)
+                    }
 
-                TextButton(onClick = { pass = ""; error = null; showPassword = false }) {
-                    Text("Назад")
+                    if (error != null) {
+                        Text(error!!, color = MaterialTheme.colorScheme.error)
+                    }
+
+                    if (!showPassword) {
+                        Button(
+                            onClick = {
+                                error = null
+                                if (biometricAvailable) startBiometric() else showPassword = true
+                            },
+                            modifier = Modifier.fillMaxWidth(0.78f)
+                        ) {
+                            Text(if (biometricAvailable) "Разблокировать" else "Ввести пароль")
+                        }
+
+                        if (biometricAvailable) {
+                            OutlinedButton(
+                                onClick = { error = null; showPassword = true },
+                                modifier = Modifier.fillMaxWidth(0.78f)
+                            ) { Text("Ввести пароль") }
+                        }
+                    }
+
+                    AnimatedVisibility(visible = showPassword) {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(10.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            OutlinedTextField(
+                                value = pass,
+                                onValueChange = { pass = it; error = null },
+                                label = { Text("Пароль") },
+                                singleLine = true,
+                                visualTransformation = PasswordVisualTransformation(),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+
+                            Button(
+                                onClick = { onUnlockByPassword(pass) { msg -> error = msg } },
+                                modifier = Modifier.fillMaxWidth(0.78f)
+                            ) { Text("Подтвердить") }
+
+                            TextButton(onClick = { pass = ""; error = null; showPassword = false }) {
+                                Text("Назад")
+                            }
+                        }
+                    }
                 }
             }
+
+            Spacer(Modifier.weight(1f))
+
+            TextButton(onClick = onLogout) { Text("Сменить аккаунт") }
         }
-
-        Spacer(Modifier.weight(1f))
-
-        TextButton(onClick = onLogout) { Text("Сменить аккаунт") }
     }
 }
