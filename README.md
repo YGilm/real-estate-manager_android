@@ -134,3 +134,9 @@ A lightweight Android app for managing real estate objects (apartments/commercia
 - Avoid `adb uninstall` and `adb shell pm clear` for `com.example.my_project`.
 - Use `./gradlew :app:installDebug` or `adb install -r` for updates (keep data).
 - Before any risky changes, back up `/data/data/com.example.my_project/databases/real_estate.db` and restore only via `run-as`.
+
+### Backup & restore script
+Use `scripts/backup_restore.sh` to save/restore both DB and files:
+- `./scripts/backup_restore.sh backup`
+- `./scripts/backup_restore.sh backup /path/to/dir`
+- `./scripts/backup_restore.sh restore /path/to/backup_dir`
