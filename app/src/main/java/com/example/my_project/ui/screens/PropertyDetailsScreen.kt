@@ -75,6 +75,7 @@ fun PropertyDetailsScreen(
 ) {
     val properties by vm.properties.collectAsState()
     val property = properties.firstOrNull { it.id == propertyId }
+    val details by vm.propertyDetails(propertyId).collectAsState(initial = null)
     val context = LocalContext.current
 
     LaunchedEffect(property?.coverUri) {
@@ -195,6 +196,14 @@ fun PropertyDetailsScreen(
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
+                                val areaText = formatArea(details?.areaSqm)
+                                if (areaText != null) {
+                                    Text(
+                                        text = "Метраж: $areaText",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
                                 if (!property?.address.isNullOrBlank()) {
                                     Text(
                                         text = property?.address.orEmpty(),
@@ -395,4 +404,11 @@ private fun moneyFormatPlain(value: Double): String {
 
     return String.format(Locale("ru", "RU"), "%,.0f", value)
         .replace('\u00A0', ' ')
+}
+
+private fun formatArea(areaSqm: String?): String? {
+    val v = areaSqm?.trim()?.replace(',', '.')?.toDoubleOrNull() ?: return null
+    if (v == 0.0) return null
+    val s = String.format(Locale("ru", "RU"), "%.2f", v)
+    return "$s м²"
 }

@@ -243,8 +243,8 @@ fun RealEstateNavigation() {
 
         composable(Destination.AddProperty.route) {
             AddPropertyScreen(
-                onSave = { name, address, monthlyRent, leaseFrom, leaseTo, coverUri ->
-                    vm.addProperty(name, address, monthlyRent, leaseFrom, leaseTo, coverUri)
+                onSave = { name, address, monthlyRent, areaSqm, leaseFrom, leaseTo, coverUri ->
+                    vm.addProperty(name, address, monthlyRent, areaSqm, leaseFrom, leaseTo, coverUri)
                     navController.popBackStack()
                 },
                 onCancel = { navController.popBackStack() }

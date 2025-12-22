@@ -174,30 +174,27 @@ private fun PropertyAvatarSmall(
 ) {
     val context = LocalContext.current
 
-    if (!imageUrl.isNullOrBlank()) {
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(imageUrl)
-                .crossfade(true)
-                .build(),
+    Box(
+        modifier = modifier
+            .size(56.dp)
+            .clip(CircleShape)
+            .background(MaterialTheme.colorScheme.surfaceVariant),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = Icons.Outlined.Apartment,
             contentDescription = null,
-            modifier = modifier
-                .size(48.dp)
-                .clip(CircleShape),
-            contentScale = ContentScale.Crop
+            tint = MaterialTheme.colorScheme.onSurfaceVariant
         )
-    } else {
-        Box(
-            modifier = modifier
-                .size(48.dp)
-                .clip(CircleShape)
-                .background(MaterialTheme.colorScheme.surfaceVariant),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = Icons.Outlined.Apartment,
+        if (!imageUrl.isNullOrBlank()) {
+            AsyncImage(
+                model = ImageRequest.Builder(context)
+                    .data(imageUrl)
+                    .crossfade(true)
+                    .build(),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                modifier = Modifier.matchParentSize(),
+                contentScale = ContentScale.Crop
             )
         }
     }

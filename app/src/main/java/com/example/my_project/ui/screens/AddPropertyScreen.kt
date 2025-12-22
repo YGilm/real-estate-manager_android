@@ -61,6 +61,7 @@ fun AddPropertyScreen(
         name: String,
         address: String?,
         monthlyRent: Double?,
+        areaSqm: String?,
         leaseFrom: String?,
         leaseTo: String?,
         coverUri: String?
@@ -72,9 +73,11 @@ fun AddPropertyScreen(
     var name by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
     var rentText by remember { mutableStateOf("") }
+    var areaText by remember { mutableStateOf("") }
     var leaseFrom by remember { mutableStateOf("") }
     var leaseTo by remember { mutableStateOf("") }
     var coverUri by remember { mutableStateOf<String?>(null) }
+    val normalizedArea = normalizeArea(areaText)
 
     // Выбор картинки для аватара
     val pickImageLauncher = rememberLauncherForActivityResult(
@@ -201,7 +204,7 @@ fun AddPropertyScreen(
                         OutlinedTextField(
                             value = name,
                             onValueChange = { name = it },
-                            label = { Text("Название") },
+                            label = { Text("Название *") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth()
                         )
@@ -222,6 +225,37 @@ fun AddPropertyScreen(
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                             modifier = Modifier.fillMaxWidth()
                         )
+
+                        OutlinedTextField(
+                            value = areaText,
+                            onValueChange = { areaText = it },
+                            label = { Text("Метраж (м²) *") },
+                            singleLine = true,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            isError = areaText.isNotBlank() && normalizedArea == null,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        if (areaText.isNotBlank() && normalizedArea == null) {
+                            Text(
+                                text = "Введите число",
+                                color = MaterialTheme.colorScheme.error
+                            )
+                        }
+
+                        val rentValue = parseMoney(rentText)
+                        val areaValue = parseArea(areaText)
+                        val ratePerSqm =
+                            if (rentValue != null && areaValue != null && areaValue > 0.0) {
+                                rentValue / areaValue
+                            } else {
+                                null
+                            }
+                        if (ratePerSqm != null) {
+                            Text(
+                                text = "Ставка за м²: ${formatMoney(ratePerSqm)} ₽/м²",
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
 
                         OutlinedTextField(
                             value = leaseFrom,
@@ -250,17 +284,15 @@ fun AddPropertyScreen(
                                 Text("Отмена")
                             }
                             Button(
-                                enabled = name.isNotBlank(),
+                                enabled = name.isNotBlank() && normalizedArea != null,
                                 onClick = {
-                                    val rent = rentText
-                                        .replace(" ", "")
-                                        .replace(",", ".")
-                                        .toDoubleOrNull()
+                                    val rent = parseMoney(rentText)
 
                                     onSave(
                                         name.trim(),
                                         address.ifBlank { null },
                                         rent,
+                                        normalizedArea,
                                         leaseFrom.ifBlank { null },
                                         leaseTo.ifBlank { null },
                                         coverUri
@@ -277,3 +309,20 @@ fun AddPropertyScreen(
         }
     }
 }
+
+private fun parseMoney(raw: String): Double? =
+    raw.trim().replace(" ", "").replace(",", ".").toDoubleOrNull()
+
+private fun parseArea(raw: String): Double? =
+    raw.trim().replace(",", ".").toDoubleOrNull()
+
+private fun normalizeArea(raw: String): String? {
+    val cleaned = raw.trim().replace(',', '.')
+    if (cleaned.isBlank()) return null
+    val value = cleaned.toDoubleOrNull() ?: return null
+    if (value == 0.0) return null
+    return String.format(java.util.Locale.US, "%.2f", value)
+}
+
+private fun formatMoney(v: Double): String =
+    String.format(java.util.Locale("ru", "RU"), "%,.0f", v).replace('\u00A0', ' ')

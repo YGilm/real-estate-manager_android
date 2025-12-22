@@ -19,6 +19,16 @@ class AuthRepository @Inject constructor(
             .digest(pwd.toByteArray())
             .joinToString("") { "%02x".format(it) }
 
+    private fun matchesPassword(storedHash: String, input: String): Boolean =
+        storedHash == hash(input) || storedHash == input
+
+    private suspend fun upgradeLegacyPasswordHash(user: UserEntity, input: String) {
+        val newHash = hash(input)
+        if (user.passwordHash == input && user.passwordHash != newHash) {
+            userDao.updatePasswordHash(user.id, newHash)
+        }
+    }
+
     suspend fun getEmailByUserId(userId: String): String? =
         withContext(Dispatchers.IO) { userDao.getById(userId)?.email }
 
@@ -45,10 +55,11 @@ class AuthRepository @Inject constructor(
             val user = userDao.getByEmail(e)
                 ?: return@withContext Result.failure(IllegalArgumentException("Неверный email/пароль"))
 
-            if (user.passwordHash != hash(password)) {
+            if (!matchesPassword(user.passwordHash, password)) {
                 return@withContext Result.failure(IllegalArgumentException("Неверный email/пароль"))
             }
 
+            upgradeLegacyPasswordHash(user, password)
             session.signIn(user.id, remember)
             Result.success(Unit)
         }
@@ -65,10 +76,11 @@ class AuthRepository @Inject constructor(
             val user = userDao.getById(userId)
                 ?: return@withContext Result.failure(IllegalStateException("Пользователь не найден"))
 
-            if (user.passwordHash != hash(password)) {
+            if (!matchesPassword(user.passwordHash, password)) {
                 return@withContext Result.failure(IllegalArgumentException("Неверный пароль"))
             }
 
+            upgradeLegacyPasswordHash(user, password)
             session.unlockAndExtend()
             Result.success(Unit)
         }
@@ -96,7 +108,7 @@ class AuthRepository @Inject constructor(
             val user = userDao.getById(userId)
                 ?: return@withContext Result.failure(IllegalStateException("Пользователь не найден"))
 
-            if (user.passwordHash != hash(oldPassword)) {
+            if (!matchesPassword(user.passwordHash, oldPassword)) {
                 return@withContext Result.failure(IllegalArgumentException("Текущий пароль неверный"))
             }
 

@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -46,9 +45,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -69,10 +70,10 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.navigationBarsPadding
 import android.content.Context
 import coil.compose.AsyncImage
 import coil.request.ImageRequest
@@ -108,16 +109,14 @@ fun PropertyInfoScreen(
     val photos by vm.propertyPhotos(propertyId).collectAsState(initial = emptyList())
     val docs by vm.attachments(propertyId).collectAsState(initial = emptyList())
 
-    // Режим редактирования текста/метража/документов
+    // Режим редактирования текста/документов
     var isEditing by rememberSaveable(propertyId) { mutableStateOf(false) }
     var draftDescription by rememberSaveable(propertyId) { mutableStateOf("") }
-    var draftArea by rememberSaveable(propertyId) { mutableStateOf("") }
 
     // При входе в режим редактирования подтягиваем текущие значения
     LaunchedEffect(isEditing) {
         if (isEditing) {
             draftDescription = details?.description.orEmpty()
-            draftArea = details?.areaSqm.orEmpty()
         }
     }
 
@@ -366,7 +365,13 @@ fun PropertyInfoScreen(
         snackbarHost = { SnackbarHost(snackbarHostState) },
         topBar = {
             TopAppBar(
-                title = { Text(property?.name ?: "Детали объекта") },
+                title = {
+                    Text(
+                        text = property?.name ?: "Детали объекта",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
@@ -377,25 +382,47 @@ fun PropertyInfoScreen(
                         IconButton(onClick = { isEditing = true }) {
                             Icon(Icons.Filled.Edit, contentDescription = "Редактировать")
                         }
-                    } else {
-                        TextButton(
+                    }
+                }
+            )
+        },
+        bottomBar = {
+            if (isEditing) {
+                Surface(
+                    tonalElevation = 2.dp
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 12.dp)
+                            .navigationBarsPadding(),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = { isEditing = false },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Отмена")
+                        }
+                        Button(
                             onClick = {
                                 vm.savePropertyDetails(
                                     propertyId = propertyId,
                                     description = draftDescription
                                         .trim()
                                         .takeIf { it.isNotBlank() },
-                                    areaSqm = normalizeArea(draftArea)
+                                    areaSqm = details?.areaSqm
                                 )
                                 isEditing = false
                                 scope.launch { snackbarHostState.showSnackbar("Сохранено") }
-                            }
-                        ) { Text("Сохранить") }
-
-                        TextButton(onClick = { isEditing = false }) { Text("Отмена") }
+                            },
+                            modifier = Modifier.weight(1f)
+                        ) {
+                            Text("Сохранить")
+                        }
                     }
                 }
-            )
+            }
         }
     ) { padding ->
         Box(
@@ -441,6 +468,11 @@ fun PropertyInfoScreen(
                     Spacer(Modifier.height(6.dp))
 
                     KeyValueRow(
+                        label = "Метраж",
+                        value = formatArea(details?.areaSqm) ?: "—"
+                    )
+
+                    KeyValueRow(
                         label = "Арендная ставка/мес.",
                         value = property?.monthlyRent?.let { "${formatMoney(it)} ₽" } ?: "—"
                     )
@@ -453,7 +485,7 @@ fun PropertyInfoScreen(
                     KeyValueRow(
                         label = "Ставка за м²:",
                         value = when {
-                            perSqm != null -> "${formatMoney(perSqm)} ₽/м²"
+                            perSqm != null -> "${formatMoney(perSqm)} ₽"
                             areaVal == null -> "Размер не задан"
                             else -> "—"
                         }
@@ -499,46 +531,6 @@ fun PropertyInfoScreen(
                             modifier = Modifier.fillMaxWidth(),
                             placeholder = { Text("Например: 2 комнаты, после ремонта, вид во двор…") }
                         )
-                    }
-                }
-            }
-
-            // Метраж
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-            ) {
-                Column(
-                    Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text("Метраж", style = MaterialTheme.typography.titleMedium)
-
-                    if (!isEditing) {
-                        Text(
-                            text = formatArea(details?.areaSqm) ?: "—",
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                    } else {
-                        OutlinedTextField(
-                            value = draftArea,
-                            onValueChange = { draftArea = it },
-                            singleLine = true,
-                            label = { Text("м²") },
-                            placeholder = { Text("Например: 45.50") },
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        formatArea(normalizeArea(draftArea))?.let { pretty ->
-                            Text(
-                                "Итог: $pretty",
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
                     }
                 }
             }
@@ -877,14 +869,6 @@ private fun openAttachment(
  * Нормализация ввода площади:
  * "45,5" -> "45.50" (строка для сохранения в БД), пусто/0 -> null.
  */
-private fun normalizeArea(raw: String): String? {
-    val cleaned = raw.trim().replace(',', '.')
-    if (cleaned.isBlank()) return null
-    val v = cleaned.toDoubleOrNull() ?: return null
-    if (v == 0.0) return null
-    return String.format(Locale.US, "%.2f", v)
-}
-
 /**
  * Парс площади из строки модели (может быть "45,50" / "45.50").
  */

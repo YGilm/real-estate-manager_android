@@ -45,6 +45,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -78,11 +79,15 @@ fun EditPropertyScreen(
     var name by remember { mutableStateOf("") }
     var address by remember { mutableStateOf("") }
     var rentText by remember { mutableStateOf("") }
+    var areaText by remember { mutableStateOf("") }
     var leaseFromText by remember { mutableStateOf("") }
     var leaseToText by remember { mutableStateOf("") }
     var coverUri by remember { mutableStateOf<String?>(null) }
 
     var showDeleteDialog by remember { mutableStateOf(false) }
+    var areaInitialized by remember { mutableStateOf(false) }
+
+    val details by vm.propertyDetails(propertyId).collectAsState(initial = null)
 
     LaunchedEffect(propertyId) {
         isLoading = true
@@ -96,6 +101,13 @@ fun EditPropertyScreen(
             coverUri = p.coverUri
         }
         isLoading = false
+    }
+
+    LaunchedEffect(details?.areaSqm) {
+        if (!areaInitialized) {
+            areaText = details?.areaSqm.orEmpty()
+            areaInitialized = true
+        }
     }
 
     val context = LocalContext.current
@@ -283,6 +295,29 @@ fun EditPropertyScreen(
                                 )
 
                                 OutlinedTextField(
+                                    value = areaText,
+                                    onValueChange = { areaText = it },
+                                    label = { Text("Метраж (м²)") },
+                                    modifier = Modifier.fillMaxWidth(),
+                                    singleLine = true
+                                )
+
+                                val rentValue = parseMoney(rentText)
+                                val areaValue = parseArea(areaText)
+                                val ratePerSqm =
+                                    if (rentValue != null && areaValue != null && areaValue > 0.0) {
+                                        rentValue / areaValue
+                                    } else {
+                                        null
+                                    }
+                                if (ratePerSqm != null) {
+                                    Text(
+                                        text = "Ставка за м²: ${formatMoney(ratePerSqm)} ₽/м²",
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+
+                                OutlinedTextField(
                                     value = leaseFromText,
                                     onValueChange = { leaseFromText = it },
                                     label = { Text("Договор аренды: с (дата)") },
@@ -355,9 +390,14 @@ fun EditPropertyScreen(
                                         id = propertyId,
                                         name = name.trim(),
                                         address = address.trim().ifBlank { null },
-                                        monthlyRent = rentText.trim().toDoubleOrNull(),
+                                        monthlyRent = parseMoney(rentText),
                                         leaseFrom = leaseFromText.trim().ifBlank { null },
                                         leaseTo = leaseToText.trim().ifBlank { null }
+                                    )
+                                    vm.savePropertyDetails(
+                                        propertyId = propertyId,
+                                        description = details?.description,
+                                        areaSqm = normalizeArea(areaText)
                                     )
                                     isSaving = false
                                     onBack()
@@ -419,3 +459,20 @@ private fun EditPropertyAvatar(
         }
     }
 }
+
+private fun parseMoney(raw: String): Double? =
+    raw.trim().replace(" ", "").replace(",", ".").toDoubleOrNull()
+
+private fun parseArea(raw: String): Double? =
+    raw.trim().replace(",", ".").toDoubleOrNull()
+
+private fun normalizeArea(raw: String): String? {
+    val cleaned = raw.trim().replace(',', '.')
+    if (cleaned.isBlank()) return null
+    val value = cleaned.toDoubleOrNull() ?: return null
+    if (value == 0.0) return null
+    return String.format(java.util.Locale.US, "%.2f", value)
+}
+
+private fun formatMoney(v: Double): String =
+    String.format(java.util.Locale("ru", "RU"), "%,.0f", v).replace('\u00A0', ' ')

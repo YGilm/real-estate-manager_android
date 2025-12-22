@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.util.UUID
 import javax.inject.Inject
 
 @HiltViewModel
@@ -66,16 +67,18 @@ class RealEstateViewModel @Inject constructor(
         name: String,
         address: String?,
         monthlyRent: Double?,
+        areaSqm: String?,
         leaseFrom: String? = null,
         leaseTo: String? = null,
         coverUri: String? = null
     ) {
         val uid = userIdFlow.value ?: return
         viewModelScope.launch {
+            val id = UUID.randomUUID().toString()
             repo.addProperty(
                 uid,
                 Property(
-                    id = "",
+                    id = id,
                     name = name,
                     address = address,
                     monthlyRent = monthlyRent,
@@ -84,6 +87,14 @@ class RealEstateViewModel @Inject constructor(
                     coverUri = coverUri
                 )
             )
+            if (!areaSqm.isNullOrBlank()) {
+                repo.upsertPropertyDetails(
+                    userId = uid,
+                    propertyId = id,
+                    description = null,
+                    areaSqm = areaSqm
+                )
+            }
         }
     }
 

@@ -125,5 +125,12 @@ A lightweight Android app for managing real estate objects (apartments/commercia
 1. Open the project in **Android Studio**
 2. Sync Gradle
 3. Run `app` on an emulator or device
+4. If `./gradlew :app:installDebug` fails to spawn `adb`, run `./gradlew --stop` and retry, or use `./gradlew --no-daemon :app:installDebug`.
 
 ---
+
+## Data safety (do not wipe current DB)
+- Never uninstall the app or use "Clear storage" in Android settings.
+- Avoid `adb uninstall` and `adb shell pm clear` for `com.example.my_project`.
+- Use `./gradlew :app:installDebug` or `adb install -r` for updates (keep data).
+- Before any risky changes, back up `/data/data/com.example.my_project/databases/real_estate.db` and restore only via `run-as`.
