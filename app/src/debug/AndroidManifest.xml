@@ -3,7 +3,7 @@
 
     <application>
         <activity
-            android:name="com.example.my_project.ui.TestComposeActivity"
+            android:name="com.example.real_estate_manager.ui.TestComposeActivity"
             android:exported="false"
             android:theme="@android:style/Theme.Material.Light.NoActionBar" />
     </application>

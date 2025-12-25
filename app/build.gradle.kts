@@ -8,11 +8,11 @@ plugins {
 }
 
 android {
-    namespace = "com.example.my_project"
+    namespace = "com.example.real_estate_manager"
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "com.example.my_project"
+        applicationId = "com.example.real_estate_manager"
         minSdk = 24
         targetSdk = 35
         versionCode = 1

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_ID="com.example.my_project"
+APP_ID="com.example.real_estate_manager"
 ADB="${ADB:-/Users/yurygilm/Library/Android/sdk/platform-tools/adb}"
 
 usage() {

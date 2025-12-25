@@ -131,9 +131,9 @@ A lightweight Android app for managing real estate objects (apartments/commercia
 
 ## Data safety (do not wipe current DB)
 - Never uninstall the app or use "Clear storage" in Android settings.
-- Avoid `adb uninstall` and `adb shell pm clear` for `com.example.my_project`.
+- Avoid `adb uninstall` and `adb shell pm clear` for `com.example.real_estate_manager`.
 - Use `./gradlew :app:installDebug` or `adb install -r` for updates (keep data).
-- Before any risky changes, back up `/data/data/com.example.my_project/databases/real_estate.db` and restore only via `run-as`.
+- Before any risky changes, back up `/data/data/com.example.real_estate_manager/databases/real_estate.db` and restore only via `run-as`.
 
 ### Backup & restore script
 Use `scripts/backup_restore.sh` to save/restore both DB and files:

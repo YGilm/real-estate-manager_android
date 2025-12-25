@@ -1,7 +1,7 @@
 # Repository Guidelines
 
 ## Project Structure & Module Organization
-- `app/src/main/java/com/example/my_project/`: Kotlin source code (UI in `ui/`, data layer in `data/`, DI in `di/`, navigation in `navigation/`).
+- `app/src/main/java/com/example/real_estate_manager/`: Kotlin source code (UI in `ui/`, data layer in `data/`, DI in `di/`, navigation in `navigation/`).
 - `app/src/main/res/`: Android resources (layouts, drawables, strings).
 - `app/src/main/AndroidManifest.xml`: app manifest.
 - `app/src/test/`: local JVM unit tests (JUnit4).
@@ -18,7 +18,7 @@
 - Kotlin + Jetpack Compose; follow standard Kotlin formatting (4-space indentation).
 - Compose UI functions are annotated with `@Composable` and use `PascalCase` names (e.g., `BillsListScreen`).
 - Data models/entities are `PascalCase`; variables and functions are `camelCase`.
-- Package names are lowercase (e.g., `com.example.my_project.ui`).
+- Package names are lowercase (e.g., `com.example.real_estate_manager.ui`).
 - No enforced formatter/linter is configured; keep changes consistent with nearby files.
 
 ## Testing Guidelines
