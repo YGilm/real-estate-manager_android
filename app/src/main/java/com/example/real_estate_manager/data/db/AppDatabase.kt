@@ -12,9 +12,12 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         TransactionEntity::class,
         AttachmentEntity::class,
         PropertyDetailsEntity::class,
-        PropertyPhotoEntity::class
+        PropertyPhotoEntity::class,
+        ProviderWidgetEntity::class,
+        WidgetFieldEntity::class,
+        FieldEntryEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -25,6 +28,9 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun attachmentDao(): AttachmentDao
     abstract fun propertyDetailsDao(): PropertyDetailsDao
     abstract fun propertyPhotoDao(): PropertyPhotoDao
+    abstract fun providerWidgetDao(): ProviderWidgetDao
+    abstract fun widgetFieldDao(): WidgetFieldDao
+    abstract fun fieldEntryDao(): FieldEntryDao
 
     companion object {
 
@@ -149,6 +155,71 @@ abstract class AppDatabase : RoomDatabase() {
                 runCatching { db.execSQL("ALTER TABLE transactions ADD COLUMN attachmentUri TEXT") }
                 runCatching { db.execSQL("ALTER TABLE transactions ADD COLUMN attachmentName TEXT") }
                 runCatching { db.execSQL("ALTER TABLE transactions ADD COLUMN attachmentMime TEXT") }
+            }
+        }
+
+        /**
+         * 5 -> 6
+         * Добавили таблицы для показаний (виджеты, поля, записи).
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS provider_widgets (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        userId TEXT NOT NULL,
+                        propertyId TEXT NOT NULL,
+                        type TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        templateKey TEXT NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        archived INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_provider_widgets_userId_propertyId ON provider_widgets(userId, propertyId)"
+                )
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS widget_fields (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        userId TEXT NOT NULL,
+                        widgetId TEXT NOT NULL,
+                        name TEXT NOT NULL,
+                        fieldType TEXT NOT NULL,
+                        unit TEXT,
+                        sortOrder INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_widget_fields_userId_widgetId ON widget_fields(userId, widgetId)"
+                )
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS field_entries (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        userId TEXT NOT NULL,
+                        fieldId TEXT NOT NULL,
+                        periodYear INTEGER NOT NULL,
+                        periodMonth INTEGER NOT NULL,
+                        valueNumber REAL,
+                        valueText TEXT,
+                        status TEXT,
+                        createdAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_field_entries_userId_fieldId ON field_entries(userId, fieldId)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_field_entries_userId_fieldId_period ON field_entries(userId, fieldId, periodYear, periodMonth)"
+                )
             }
         }
     }

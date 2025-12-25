@@ -119,3 +119,68 @@ interface AttachmentDao {
     @Query("DELETE FROM attachments WHERE userId = :userId AND propertyId = :propertyId")
     suspend fun deleteForProperty(userId: String, propertyId: String)
 }
+
+// ---------- PROVIDER WIDGETS ----------
+@Dao
+interface ProviderWidgetDao {
+    @Query(
+        "SELECT * FROM provider_widgets " +
+            "WHERE userId = :userId AND propertyId = :propertyId AND archived = 0 " +
+            "ORDER BY createdAt DESC"
+    )
+    fun observeForProperty(userId: String, propertyId: String): Flow<List<ProviderWidgetEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(entity: ProviderWidgetEntity)
+
+    @Query("UPDATE provider_widgets SET title = :title WHERE userId = :userId AND id = :id")
+    suspend fun updateTitle(userId: String, id: String, title: String)
+
+    @Query("UPDATE provider_widgets SET archived = :archived WHERE userId = :userId AND id = :id")
+    suspend fun setArchived(userId: String, id: String, archived: Boolean)
+}
+
+// ---------- WIDGET FIELDS ----------
+@Dao
+interface WidgetFieldDao {
+    @Query(
+        "SELECT * FROM widget_fields " +
+            "WHERE userId = :userId AND widgetId = :widgetId " +
+            "ORDER BY sortOrder"
+    )
+    fun observeForWidget(userId: String, widgetId: String): Flow<List<WidgetFieldEntity>>
+
+    @Query(
+        "SELECT * FROM widget_fields " +
+            "WHERE userId = :userId AND widgetId IN (" +
+            "SELECT id FROM provider_widgets WHERE userId = :userId AND propertyId = :propertyId" +
+            ") ORDER BY sortOrder"
+    )
+    fun observeForProperty(userId: String, propertyId: String): Flow<List<WidgetFieldEntity>>
+
+    @Query("SELECT * FROM widget_fields WHERE userId = :userId AND widgetId = :widgetId ORDER BY sortOrder")
+    suspend fun listForWidget(userId: String, widgetId: String): List<WidgetFieldEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(list: List<WidgetFieldEntity>)
+
+    @Query("DELETE FROM widget_fields WHERE userId = :userId AND id IN (:ids)")
+    suspend fun deleteByIds(userId: String, ids: List<String>)
+}
+
+// ---------- FIELD ENTRIES ----------
+@Dao
+interface FieldEntryDao {
+    @Query(
+        "SELECT * FROM field_entries " +
+            "WHERE userId = :userId AND fieldId IN (" +
+            "SELECT id FROM widget_fields WHERE userId = :userId AND widgetId IN (" +
+            "SELECT id FROM provider_widgets WHERE userId = :userId AND propertyId = :propertyId" +
+            ")" +
+            ") ORDER BY periodYear DESC, periodMonth DESC"
+    )
+    fun observeForProperty(userId: String, propertyId: String): Flow<List<FieldEntryEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertAll(list: List<FieldEntryEntity>)
+}

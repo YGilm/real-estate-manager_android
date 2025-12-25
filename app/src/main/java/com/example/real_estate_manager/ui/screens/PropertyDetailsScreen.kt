@@ -19,13 +19,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Insights
 import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.outlined.Apartment
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ElevatedButton
@@ -35,15 +33,12 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -104,28 +99,6 @@ fun PropertyDetailsScreen(
     val expense = yearTransactions.filter { it.type == TxType.EXPENSE }.sumOf { it.amount }
     val total = income - expense
     val monthsWithTx = yearTransactions.map { it.date.monthValue }.distinct().size
-
-    var featureStubMessage by remember { mutableStateOf<String?>(null) }
-
-    if (featureStubMessage != null) {
-        AlertDialog(
-            onDismissRequest = { featureStubMessage = null },
-            icon = {
-                Icon(
-                    Icons.Filled.Build,
-                    contentDescription = "В разработке",
-                    modifier = Modifier.size(72.dp)
-                )
-            },
-            title = { Text("Упс...") },
-            text = { Text( "Данный функционал в разработке") },
-            confirmButton = {
-                TextButton(onClick = { featureStubMessage = null }) {
-                    Text("ок")
-                }
-            }
-        )
-    }
 
     Scaffold(
         topBar = {
@@ -247,11 +220,7 @@ fun PropertyDetailsScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 ElevatedButton(
-                    onClick = {
-                        featureStubMessage =
-                            "Потому что пока не может увидеть показания по этому объекту. " +
-                                    "Мы уже работаем над этим функционалом, чтобы не расстраивать котика."
-                    },
+                    onClick = onOpenBills,
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
                 ) {

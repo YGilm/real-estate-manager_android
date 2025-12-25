@@ -1,11 +1,14 @@
 package com.example.real_estate_manager.data
 
 import com.example.real_estate_manager.data.model.Attachment
+import com.example.real_estate_manager.data.model.FieldEntry
 import com.example.real_estate_manager.data.model.Property
 import com.example.real_estate_manager.data.model.PropertyDetails
 import com.example.real_estate_manager.data.model.PropertyPhoto
+import com.example.real_estate_manager.data.model.ProviderWidget
 import com.example.real_estate_manager.data.model.Transaction
 import com.example.real_estate_manager.data.model.TxType
+import com.example.real_estate_manager.data.model.WidgetField
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
 
@@ -88,4 +91,21 @@ interface RealEstateRepository {
     )
 
     suspend fun deleteAttachment(userId: String, id: String)
+
+    // ---------- Provider widgets (readings) ----------
+    fun providerWidgets(userId: String, propertyId: String): Flow<List<ProviderWidget>>
+    fun widgetFields(userId: String, propertyId: String): Flow<List<WidgetField>>
+    fun fieldEntries(userId: String, propertyId: String): Flow<List<FieldEntry>>
+
+    suspend fun addProviderWidget(
+        userId: String,
+        widget: ProviderWidget,
+        fields: List<WidgetField>
+    )
+
+    suspend fun upsertFieldEntries(userId: String, entries: List<FieldEntry>)
+
+    suspend fun updateProviderWidgetTitle(userId: String, widgetId: String, title: String)
+    suspend fun setProviderWidgetArchived(userId: String, widgetId: String, archived: Boolean)
+    suspend fun updateWidgetFields(userId: String, widgetId: String, fields: List<WidgetField>)
 }

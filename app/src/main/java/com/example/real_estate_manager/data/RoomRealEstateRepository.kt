@@ -2,20 +2,29 @@ package com.example.real_estate_manager.data
 
 import com.example.real_estate_manager.data.db.AttachmentDao
 import com.example.real_estate_manager.data.db.AttachmentEntity
+import com.example.real_estate_manager.data.db.FieldEntryDao
+import com.example.real_estate_manager.data.db.FieldEntryEntity
 import com.example.real_estate_manager.data.db.PropertyDao
 import com.example.real_estate_manager.data.db.PropertyDetailsDao
 import com.example.real_estate_manager.data.db.PropertyDetailsEntity
 import com.example.real_estate_manager.data.db.PropertyEntity
 import com.example.real_estate_manager.data.db.PropertyPhotoDao
 import com.example.real_estate_manager.data.db.PropertyPhotoEntity
+import com.example.real_estate_manager.data.db.ProviderWidgetDao
+import com.example.real_estate_manager.data.db.ProviderWidgetEntity
 import com.example.real_estate_manager.data.db.TransactionDao
 import com.example.real_estate_manager.data.db.TransactionEntity
+import com.example.real_estate_manager.data.db.WidgetFieldDao
+import com.example.real_estate_manager.data.db.WidgetFieldEntity
 import com.example.real_estate_manager.data.model.Attachment
+import com.example.real_estate_manager.data.model.FieldEntry
 import com.example.real_estate_manager.data.model.Property
 import com.example.real_estate_manager.data.model.PropertyDetails
 import com.example.real_estate_manager.data.model.PropertyPhoto
+import com.example.real_estate_manager.data.model.ProviderWidget
 import com.example.real_estate_manager.data.model.Transaction
 import com.example.real_estate_manager.data.model.TxType
+import com.example.real_estate_manager.data.model.WidgetField
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
@@ -38,6 +47,9 @@ class RoomRealEstateRepository @Inject constructor(
     private val propertyPhotoDao: PropertyPhotoDao,
     private val transactionDao: TransactionDao,
     private val attachmentDao: AttachmentDao,
+    private val providerWidgetDao: ProviderWidgetDao,
+    private val widgetFieldDao: WidgetFieldDao,
+    private val fieldEntryDao: FieldEntryDao,
 ) : RealEstateRepository {
 
     // ---------- Properties ----------
@@ -291,6 +303,66 @@ class RoomRealEstateRepository @Inject constructor(
         withContext(Dispatchers.IO) {
             attachmentDao.delete(userId, id)
         }
+
+    // ---------- Provider widgets (readings) ----------
+
+    override fun providerWidgets(userId: String, propertyId: String): Flow<List<ProviderWidget>> =
+        providerWidgetDao.observeForProperty(userId, propertyId).map { list ->
+            list.map { it.toModel() }
+        }
+
+    override fun widgetFields(userId: String, propertyId: String): Flow<List<WidgetField>> =
+        widgetFieldDao.observeForProperty(userId, propertyId).map { list ->
+            list.map { it.toModel() }
+        }
+
+    override fun fieldEntries(userId: String, propertyId: String): Flow<List<FieldEntry>> =
+        fieldEntryDao.observeForProperty(userId, propertyId).map { list ->
+            list.map { it.toModel() }
+        }
+
+    override suspend fun addProviderWidget(
+        userId: String,
+        widget: ProviderWidget,
+        fields: List<WidgetField>,
+    ) = withContext(Dispatchers.IO) {
+        providerWidgetDao.upsert(widget.toEntity(userId))
+        if (fields.isNotEmpty()) {
+            widgetFieldDao.upsertAll(fields.map { it.toEntity(userId) })
+        }
+    }
+
+    override suspend fun upsertFieldEntries(userId: String, entries: List<FieldEntry>) =
+        withContext(Dispatchers.IO) {
+            if (entries.isEmpty()) return@withContext
+            fieldEntryDao.upsertAll(entries.map { it.toEntity(userId) })
+        }
+
+    override suspend fun updateProviderWidgetTitle(userId: String, widgetId: String, title: String) =
+        withContext(Dispatchers.IO) {
+            providerWidgetDao.updateTitle(userId, widgetId, title)
+        }
+
+    override suspend fun setProviderWidgetArchived(userId: String, widgetId: String, archived: Boolean) =
+        withContext(Dispatchers.IO) {
+            providerWidgetDao.setArchived(userId, widgetId, archived)
+        }
+
+    override suspend fun updateWidgetFields(
+        userId: String,
+        widgetId: String,
+        fields: List<WidgetField>,
+    ) = withContext(Dispatchers.IO) {
+        val existing = widgetFieldDao.listForWidget(userId, widgetId)
+        val incomingIds = fields.map { it.id }.toSet()
+        val toDelete = existing.map { it.id }.filter { it !in incomingIds }
+        if (toDelete.isNotEmpty()) {
+            widgetFieldDao.deleteByIds(userId, toDelete)
+        }
+        if (fields.isNotEmpty()) {
+            widgetFieldDao.upsertAll(fields.map { it.toEntity(userId) })
+        }
+    }
 }
 
 // ---------- Маппинги сущностей ----------
@@ -352,4 +424,73 @@ private fun AttachmentEntity.toModel(): Attachment =
         name = name,
         mimeType = mimeType,
         uri = uri
+    )
+
+private fun ProviderWidgetEntity.toModel(): ProviderWidget =
+    ProviderWidget(
+        id = id,
+        propertyId = propertyId,
+        type = enumValueOf(type),
+        title = title,
+        templateKey = templateKey,
+        createdAt = createdAt,
+        archived = archived
+    )
+
+private fun ProviderWidget.toEntity(userId: String): ProviderWidgetEntity =
+    ProviderWidgetEntity(
+        id = id,
+        userId = userId,
+        propertyId = propertyId,
+        type = type.name,
+        title = title,
+        templateKey = templateKey,
+        createdAt = createdAt,
+        archived = archived
+    )
+
+private fun WidgetFieldEntity.toModel(): WidgetField =
+    WidgetField(
+        id = id,
+        widgetId = widgetId,
+        name = name,
+        fieldType = enumValueOf(fieldType),
+        unit = unit,
+        sortOrder = sortOrder
+    )
+
+private fun WidgetField.toEntity(userId: String): WidgetFieldEntity =
+    WidgetFieldEntity(
+        id = id,
+        userId = userId,
+        widgetId = widgetId,
+        name = name,
+        fieldType = fieldType.name,
+        unit = unit,
+        sortOrder = sortOrder
+    )
+
+private fun FieldEntryEntity.toModel(): FieldEntry =
+    FieldEntry(
+        id = id,
+        fieldId = fieldId,
+        periodYear = periodYear,
+        periodMonth = periodMonth,
+        valueNumber = valueNumber,
+        valueText = valueText,
+        status = status,
+        createdAt = createdAt
+    )
+
+private fun FieldEntry.toEntity(userId: String): FieldEntryEntity =
+    FieldEntryEntity(
+        id = id,
+        userId = userId,
+        fieldId = fieldId,
+        periodYear = periodYear,
+        periodMonth = periodMonth,
+        valueNumber = valueNumber,
+        valueText = valueText,
+        status = status,
+        createdAt = createdAt
     )

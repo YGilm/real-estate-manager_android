@@ -22,6 +22,7 @@ import com.example.real_estate_manager.ui.screens.LockScreen
 import com.example.real_estate_manager.ui.screens.PropertiesListScreen
 import com.example.real_estate_manager.ui.screens.PropertyDetailsScreen
 import com.example.real_estate_manager.ui.screens.PropertyInfoScreen
+import com.example.real_estate_manager.ui.screens.PropertyReadingsScreen
 import com.example.real_estate_manager.ui.screens.PropertyTransactionsScreen
 import com.example.real_estate_manager.ui.screens.SignInScreen
 import com.example.real_estate_manager.ui.screens.SignUpScreen
@@ -58,6 +59,11 @@ sealed class Destination(val route: String) {
     data object PropertyTransactions : Destination("properties/{propertyId}/transactions") {
         const val ARG_PROPERTY_ID = "propertyId"
         fun route(propertyId: String): String = "properties/${Uri.encode(propertyId)}/transactions"
+    }
+
+    data object PropertyReadings : Destination("properties/{propertyId}/readings") {
+        const val ARG_PROPERTY_ID = "propertyId"
+        fun route(propertyId: String): String = "properties/${Uri.encode(propertyId)}/readings"
     }
 
     data object Stats : Destination("stats?propertyId={propertyId}") {
@@ -268,7 +274,7 @@ fun RealEstateNavigation() {
                 onEditProperty = { navController.navigate(Destination.EditProperty.route(propertyId)) },
                 onOpenDetails = { navController.navigate(Destination.PropertyInfo.route(propertyId)) },
                 onOpenStatsForProperty = { navController.navigate(Destination.Stats.route(propertyId)) },
-                onOpenBills = { /* заглушка */ },
+                onOpenBills = { navController.navigate(Destination.PropertyReadings.route(propertyId)) },
                 onOpenTransactions = { navController.navigate(Destination.PropertyTransactions.route(propertyId)) }
             )
         }
@@ -325,6 +331,22 @@ fun RealEstateNavigation() {
 
             PropertyTransactionsScreen(
                 vm = vm,
+                propertyId = propertyId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Destination.PropertyReadings.route,
+            arguments = listOf(
+                navArgument(Destination.PropertyReadings.ARG_PROPERTY_ID) { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val propertyId = backStackEntry.arguments
+                ?.getString(Destination.PropertyReadings.ARG_PROPERTY_ID)
+                ?: return@composable
+
+            PropertyReadingsScreen(
                 propertyId = propertyId,
                 onBack = { navController.popBackStack() }
             )
