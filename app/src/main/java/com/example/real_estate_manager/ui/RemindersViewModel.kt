@@ -129,32 +129,6 @@ class RemindersViewModel @Inject constructor(
         }
     }
 
-    fun createDebugOneMinuteReminder(propertyId: String?) {
-        val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
-            val triggerAt = LocalDateTime.now().plusSeconds(60)
-            reminders.createRule(
-                userId = uid,
-                propertyId = propertyId,
-                title = "Тест уведомления",
-                message = "Проверка напоминания через 1 минуту",
-                type = ReminderType.UTILITIES,
-                scheduleMode = ReminderScheduleMode.ONE_TIME,
-                oneTimeAt = triggerAt.toMillis(),
-                rangeStartAt = null,
-                rangeEndAt = null,
-                dayOfMonth = null,
-                rangeStartDay = null,
-                rangeEndDay = null,
-                repeatEveryDays = null,
-                offsetDays = null,
-                hour = triggerAt.hour,
-                minute = triggerAt.minute,
-                enabled = true
-            )
-        }
-    }
-
     fun setEnabled(rule: ReminderRuleEntity, enabled: Boolean) {
         viewModelScope.launch {
             val updatedBase = rule.copy(enabled = enabled, updatedAt = System.currentTimeMillis())
@@ -169,6 +143,4 @@ class RemindersViewModel @Inject constructor(
         }
     }
 
-    private fun LocalDateTime.toMillis(): Long =
-        atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
 }

@@ -7,7 +7,6 @@ package com.example.real_estate_manager.ui.screens
 
 import android.Manifest
 import android.os.Build
-import android.content.pm.ApplicationInfo
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -67,7 +66,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.unit.dp
@@ -96,10 +94,6 @@ fun RemindersScreen(
     val property = properties.firstOrNull { it.id == propertyId }
     var showCreate by remember { mutableStateOf(false) }
     var editingRule by remember { mutableStateOf<ReminderRuleEntity?>(null) }
-    val context = LocalContext.current
-    val isDebug = remember {
-        (context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
-    }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     fun requestNotificationsPermission() {
@@ -144,17 +138,6 @@ fun RemindersScreen(
                 )
                 .padding(16.dp)
         ) {
-            if (isDebug) {
-                TextButton(
-                    modifier = Modifier.fillMaxWidth(),
-                    onClick = {
-                        requestNotificationsPermission()
-                        vm.createDebugOneMinuteReminder(propertyId)
-                    }
-                ) {
-                    Text("Тест уведомления через 1 минуту")
-                }
-            }
             if (rules.isEmpty()) {
                 EmptyState(
                     modifier = Modifier

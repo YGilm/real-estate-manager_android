@@ -206,3 +206,22 @@ interface ReminderDao {
     @Query("DELETE FROM reminders WHERE userId = :userId AND id = :id")
     suspend fun deleteById(userId: String, id: String)
 }
+
+// ---------- NOTIFICATIONS ----------
+@Dao
+interface NotificationDao {
+    @Query("SELECT * FROM notifications WHERE userId = :userId AND isActive = 1 ORDER BY createdAt DESC")
+    fun observeActive(userId: String): Flow<List<NotificationEntity>>
+
+    @Query("SELECT COUNT(*) FROM notifications WHERE userId = :userId AND isActive = 1")
+    fun countActive(userId: String): Flow<Int>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(entity: NotificationEntity)
+
+    @Query("UPDATE notifications SET isActive = 0, deactivatedAt = :now WHERE userId = :userId AND id = :id")
+    suspend fun deactivate(userId: String, id: String, now: Long = System.currentTimeMillis())
+
+    @Query("UPDATE notifications SET isActive = 0, deactivatedAt = :now WHERE userId = :userId AND isActive = 1")
+    suspend fun deactivateAll(userId: String, now: Long = System.currentTimeMillis())
+}

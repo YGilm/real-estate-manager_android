@@ -7,8 +7,14 @@ import com.example.real_estate_manager.navigation.RealEstateNavigation
 import com.example.real_estate_manager.ui.theme.AppTheme
 
 @Composable
-fun RealEstateApp() {
+fun RealEstateApp(
+    openNotificationsRequest: Boolean = false,
+    onNotificationsRequestHandled: () -> Unit = {}
+) {
     AppTheme {
-        RealEstateNavigation()
+        RealEstateNavigation(
+            openNotificationsRequest = openNotificationsRequest,
+            onNotificationsRequestHandled = onNotificationsRequestHandled
+        )
     }
 }

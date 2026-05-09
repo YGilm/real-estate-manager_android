@@ -16,9 +16,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         ProviderWidgetEntity::class,
         WidgetFieldEntity::class,
         FieldEntryEntity::class,
-        ReminderRuleEntity::class
+        ReminderRuleEntity::class,
+        NotificationEntity::class
     ],
-    version = 8,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -33,6 +34,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun widgetFieldDao(): WidgetFieldDao
     abstract fun fieldEntryDao(): FieldEntryDao
     abstract fun reminderDao(): ReminderDao
+    abstract fun notificationDao(): NotificationDao
 
     companion object {
 
@@ -275,6 +277,32 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL("ALTER TABLE reminders ADD COLUMN oneTimeAt INTEGER")
                 db.execSQL("ALTER TABLE reminders ADD COLUMN rangeStartAt INTEGER")
                 db.execSQL("ALTER TABLE reminders ADD COLUMN rangeEndAt INTEGER")
+            }
+        }
+
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS notifications (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        userId TEXT NOT NULL,
+                        propertyId TEXT,
+                        ruleId TEXT,
+                        title TEXT NOT NULL,
+                        message TEXT,
+                        createdAt INTEGER NOT NULL,
+                        isActive INTEGER NOT NULL,
+                        deactivatedAt INTEGER
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_notifications_userId_isActive_createdAt ON notifications(userId, isActive, createdAt)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_notifications_userId_propertyId ON notifications(userId, propertyId)"
+                )
             }
         }
     }

@@ -25,6 +25,7 @@ import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.LockReset
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material3.AlertDialog
@@ -57,6 +58,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.real_estate_manager.data.model.TxType
 import com.example.real_estate_manager.ui.AuthViewModel
+import com.example.real_estate_manager.ui.NotificationsViewModel
 import com.example.real_estate_manager.ui.RealEstateViewModel
 import com.example.real_estate_manager.ui.util.computeTotals
 import com.example.real_estate_manager.ui.util.moneyFormatPlain
@@ -67,14 +69,17 @@ import java.time.LocalDate
 fun HomeScreen(
     onOpenStats: () -> Unit,
     onOpenProperties: () -> Unit,
+    onOpenNotifications: () -> Unit,
     onLogoutNavigate: () -> Unit = {}
 ) {
     val vm: RealEstateViewModel = hiltViewModel()
     val authVm: AuthViewModel = hiltViewModel()
+    val notificationsVm: NotificationsViewModel = hiltViewModel()
 
     val transactions by vm.transactions.collectAsState()
     val properties by vm.properties.collectAsState()
     val currentEmail by authVm.currentEmail.collectAsState()
+    val activeNotificationsCount by notificationsVm.activeCount.collectAsState()
 
     val now = LocalDate.now()
     val mName = monthName(now.monthValue)
@@ -173,6 +178,8 @@ fun HomeScreen(
 
                     UserMenuButton(
                         email = currentEmail,
+                        hasActiveNotifications = activeNotificationsCount > 0,
+                        onOpenNotifications = onOpenNotifications,
                         onLogout = {
                             authVm.logout()
                             onLogoutNavigate()
@@ -405,6 +412,8 @@ fun HomeScreen(
 @Composable
 private fun UserMenuButton(
     email: String?,
+    hasActiveNotifications: Boolean,
+    onOpenNotifications: () -> Unit,
     onLogout: () -> Unit,
     onChangePassword: (String, String, (String?) -> Unit) -> Unit
 ) {
@@ -428,6 +437,14 @@ private fun UserMenuButton(
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
+            if (hasActiveNotifications) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .size(9.dp)
+                        .background(Color.Red, RoundedCornerShape(50))
+                )
+            }
         }
 
         DropdownMenu(
@@ -443,6 +460,20 @@ private fun UserMenuButton(
                     )
                 },
                 onClick = { }
+            )
+
+            DropdownMenuItem(
+                text = { Text("Уведомления") },
+                leadingIcon = {
+                    androidx.compose.material3.Icon(
+                        imageVector = Icons.Filled.Notifications,
+                        contentDescription = null
+                    )
+                },
+                onClick = {
+                    expanded = false
+                    onOpenNotifications()
+                }
             )
 
             DropdownMenuItem(

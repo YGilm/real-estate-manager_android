@@ -19,6 +19,7 @@ import com.example.real_estate_manager.ui.screens.AddPropertyScreen
 import com.example.real_estate_manager.ui.screens.EditPropertyScreen
 import com.example.real_estate_manager.ui.screens.HomeScreen
 import com.example.real_estate_manager.ui.screens.LockScreen
+import com.example.real_estate_manager.ui.screens.NotificationsScreen
 import com.example.real_estate_manager.ui.screens.PropertiesListScreen
 import com.example.real_estate_manager.ui.screens.PropertyDetailsScreen
 import com.example.real_estate_manager.ui.screens.PropertyInfoScreen
@@ -39,6 +40,7 @@ sealed class Destination(val route: String) {
     data object Lock : Destination("auth/lock")
 
     data object Home : Destination("home")
+    data object Notifications : Destination("notifications")
     data object Properties : Destination("properties")
     data object AddProperty : Destination("properties/add")
 
@@ -102,7 +104,10 @@ sealed class Destination(val route: String) {
 }
 
 @Composable
-fun RealEstateNavigation() {
+fun RealEstateNavigation(
+    openNotificationsRequest: Boolean = false,
+    onNotificationsRequestHandled: () -> Unit = {}
+) {
     val navController: NavHostController = rememberNavController()
 
     val vm: RealEstateViewModel = hiltViewModel()
@@ -117,6 +122,15 @@ fun RealEstateNavigation() {
                 popUpTo(startId) { inclusive = true }
                 launchSingleTop = true
             }
+        }
+    }
+
+    LaunchedEffect(openNotificationsRequest, sessionState.userId, sessionState.locked) {
+        if (openNotificationsRequest && sessionState.userId != null && !sessionState.locked) {
+            navController.navigate(Destination.Notifications.route) {
+                launchSingleTop = true
+            }
+            onNotificationsRequestHandled()
         }
     }
 
@@ -236,6 +250,7 @@ fun RealEstateNavigation() {
             HomeScreen(
                 onOpenStats = { navController.navigate(Destination.Stats.route()) },
                 onOpenProperties = { navController.navigate(Destination.Properties.route) },
+                onOpenNotifications = { navController.navigate(Destination.Notifications.route) },
                 onLogoutNavigate = {
                     val startId = navController.graph.findStartDestination().id
                     navController.navigate(Destination.SignIn.route) {
@@ -243,6 +258,12 @@ fun RealEstateNavigation() {
                         launchSingleTop = true
                     }
                 }
+            )
+        }
+
+        composable(Destination.Notifications.route) {
+            NotificationsScreen(
+                onBack = { navController.popBackStack() }
             )
         }
 

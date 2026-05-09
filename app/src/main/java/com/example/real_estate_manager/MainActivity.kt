@@ -1,7 +1,9 @@
 package com.example.real_estate_manager
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.compose.setContent
+import androidx.compose.runtime.mutableStateOf
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
@@ -22,6 +24,8 @@ class MainActivity : FragmentActivity() {
 
     @Inject
     lateinit var reminderScheduler: ReminderScheduler
+
+    private val openNotificationsRequest = mutableStateOf(false)
 
     private val appLifecycleObserver = LifecycleEventObserver { _, event ->
         when (event) {
@@ -52,14 +56,38 @@ class MainActivity : FragmentActivity() {
         }
 
         ProcessLifecycleOwner.get().lifecycle.addObserver(appLifecycleObserver)
+        handleIntent(intent)
 
         setContent {
-            RealEstateApp()
+            RealEstateApp(
+                openNotificationsRequest = openNotificationsRequest.value,
+                onNotificationsRequestHandled = { openNotificationsRequest.value = false }
+            )
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntent(intent)
     }
 
     override fun onDestroy() {
         ProcessLifecycleOwner.get().lifecycle.removeObserver(appLifecycleObserver)
         super.onDestroy()
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_OPEN_NOTIFICATIONS, false) == true ||
+            intent?.action == ACTION_OPEN_NOTIFICATIONS
+        ) {
+            openNotificationsRequest.value = true
+        }
+    }
+
+    companion object {
+        const val ACTION_OPEN_NOTIFICATIONS = "com.example.real_estate_manager.OPEN_NOTIFICATIONS"
+        const val EXTRA_OPEN_NOTIFICATIONS = "open_notifications"
+        const val EXTRA_NOTIFICATION_ID = "notification_id"
     }
 }
