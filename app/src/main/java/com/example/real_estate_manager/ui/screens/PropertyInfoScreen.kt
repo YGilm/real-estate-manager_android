@@ -30,7 +30,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.AttachFile
-import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Edit
@@ -281,27 +280,6 @@ fun PropertyInfoScreen(
             },
             dismissButton = {
                 TextButton(onClick = { pendingDocUri = null }) { Text("Отмена") }
-            }
-        )
-    }
-
-    // ---------- Заглушка арендатора ----------
-    var showTenantStub by remember { mutableStateOf(false) }
-
-    if (showTenantStub) {
-        AlertDialog(
-            onDismissRequest = { showTenantStub = false },
-            icon = {
-                Icon(
-                    Icons.Filled.Build,
-                    contentDescription = "В разработке",
-                    modifier = Modifier.size(72.dp)
-                )
-            },
-            title = { Text("Упс...") },
-            text = { Text("Данный функционал в разработке") },
-            confirmButton = {
-                TextButton(onClick = { showTenantStub = false }) { Text("Ок") }
             }
         )
     }
@@ -756,25 +734,6 @@ fun PropertyInfoScreen(
                 }
             }
 
-            // Арендатор (пока заглушка)
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
-                ),
-                elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
-            ) {
-                Column(
-                    Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Text("Арендатор", style = MaterialTheme.typography.titleMedium)
-                    Button(onClick = { showTenantStub = true }) {
-                        Text("Открыть арендатора")
-                    }
-                }
-            }
             }
         }
     }

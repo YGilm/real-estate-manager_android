@@ -21,8 +21,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Insights
-import androidx.compose.material.icons.filled.Speed
+import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.outlined.Apartment
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -211,7 +211,7 @@ fun PropertyDetailsScreen(
                 ) {
                     Icon(Icons.AutoMirrored.Filled.ReceiptLong, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
-                    Text("Транзакции")
+                    Text("Платежи")
                 }
             }
 
@@ -224,7 +224,7 @@ fun PropertyDetailsScreen(
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
                 ) {
-                    Icon(Icons.Filled.Speed, contentDescription = null)
+                    Icon(Icons.Filled.WaterDrop, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
                     Text("Показания")
                 }
@@ -234,7 +234,7 @@ fun PropertyDetailsScreen(
                     modifier = Modifier.weight(1f),
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
                 ) {
-                    Icon(Icons.Filled.Insights, contentDescription = null)
+                    Icon(Icons.Filled.BarChart, contentDescription = null)
                     Spacer(Modifier.size(8.dp))
                     Text("Статистика")
                 }

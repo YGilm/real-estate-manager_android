@@ -19,9 +19,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AccountCircle
 import androidx.compose.material.icons.filled.Apartment
@@ -55,12 +53,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.example.real_estate_manager.data.model.TxType
 import com.example.real_estate_manager.ui.AuthViewModel
 import com.example.real_estate_manager.ui.RealEstateViewModel
+import com.example.real_estate_manager.ui.util.computeTotals
 import com.example.real_estate_manager.ui.util.moneyFormatPlain
 import com.example.real_estate_manager.ui.util.monthName
 import java.time.LocalDate
@@ -92,6 +90,9 @@ fun HomeScreen(
     val income = monthTransactions.filter { it.type == TxType.INCOME }.sumOf { it.amount }
     val expense = monthTransactions.filter { it.type == TxType.EXPENSE }.sumOf { it.amount }
     val delta = income - expense
+    val yearTotals = transactions
+        .filter { it.date.year == year }
+        .computeTotals()
 
     // Анимация «дыхания» иконки
     val infiniteTransition = rememberInfiniteTransition(label = "home_breathe")
@@ -125,8 +126,6 @@ fun HomeScreen(
         label = "cityline_phase"
     )
 
-    val scrollState = rememberScrollState()
-
     Surface(modifier = Modifier.fillMaxSize()) {
         Box(
             modifier = Modifier
@@ -144,9 +143,8 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .statusBarsPadding()
-                    .padding(horizontal = 16.dp, vertical = 18.dp)
-                    .verticalScroll(scrollState),
-                verticalArrangement = Arrangement.spacedBy(16.dp)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 // Заголовок + иконка пользователя
                 Row(
@@ -277,14 +275,106 @@ fun HomeScreen(
                     }
                 }
 
+                // Мини-виджет: итоги за текущий год
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f)
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .padding(16.dp)
+                            .alpha(cardAlpha),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .graphicsLayer(scaleX = scale, scaleY = scale)
+                                    .background(
+                                        color = MaterialTheme.colorScheme.primary.copy(alpha = 0.15f),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                androidx.compose.material3.Icon(
+                                    imageVector = Icons.Filled.PieChart,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                            }
+
+                            Column {
+                                Text(
+                                    text = "Итог за текущий год",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                                Text(
+                                    text = "Доход, расход и чистый результат за год",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
+
+                        Spacer(Modifier.height(4.dp))
+
+                        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Доход")
+                                Text(
+                                    text = moneyFormatPlain(yearTotals.income),
+                                    color = Color(0xFF2E7D32),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Расход")
+                                Text(
+                                    text = "- ${moneyFormatPlain(yearTotals.expense)}",
+                                    color = Color(0xFFC62828),
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("Чистый результат")
+                                Text(
+                                    text = moneyFormatPlain(yearTotals.total),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
+                        }
+                    }
+                }
+
                 // Кнопки-действия
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     HomeActionCard(
-                        title = "Объекты недвижимости",
-                        subtitle = "Список помещений, карточки объектов, счета и транзакции",
+                        title = "Мои объекты недвижимости",
+                        subtitle = "Список объектов, карточки объектов, показания и платежи",
                         icon = Icons.Filled.Apartment,
                         tint = MaterialTheme.colorScheme.primary,
                         onClick = onOpenProperties
@@ -292,34 +382,20 @@ fun HomeScreen(
 
                     HomeActionCard(
                         title = "Статистика",
-                        subtitle = "Общая картина: помесячно, по объектам и по типам транзакций",
+                        subtitle = "Общая картина: помесячно, по объектам и по типам платежей",
                         icon = Icons.Filled.Assessment,
                         tint = MaterialTheme.colorScheme.primary,
                         onClick = onOpenStats
                     )
                 }
 
-                Spacer(Modifier.height(8.dp))
-
                 // ✅ ТВОЯ декоративная линия «города» (домики/окна)
                 BottomCityline(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(72.dp),
+                        .height(56.dp),
                     phase = citylinePhase,
-                    scroll = scrollState.value
-                )
-
-                Spacer(Modifier.height(6.dp))
-                Text(
-                    text = "Управление недвижимостью",
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 4.dp),
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.labelMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.75f),
-                    fontWeight = FontWeight.SemiBold
+                    scroll = 0
                 )
             }
         }
