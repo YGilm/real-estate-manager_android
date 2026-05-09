@@ -24,6 +24,7 @@ import com.example.real_estate_manager.ui.screens.PropertyDetailsScreen
 import com.example.real_estate_manager.ui.screens.PropertyInfoScreen
 import com.example.real_estate_manager.ui.screens.PropertyReadingsScreen
 import com.example.real_estate_manager.ui.screens.PropertyTransactionsScreen
+import com.example.real_estate_manager.ui.screens.RemindersScreen
 import com.example.real_estate_manager.ui.screens.SignInScreen
 import com.example.real_estate_manager.ui.screens.SignUpScreen
 import com.example.real_estate_manager.ui.screens.StatsMonthScreen
@@ -64,6 +65,15 @@ sealed class Destination(val route: String) {
     data object PropertyReadings : Destination("properties/{propertyId}/readings") {
         const val ARG_PROPERTY_ID = "propertyId"
         fun route(propertyId: String): String = "properties/${Uri.encode(propertyId)}/readings"
+    }
+
+    data object Reminders : Destination("reminders?propertyId={propertyId}") {
+        const val ARG_PROPERTY_ID = "propertyId"
+
+        fun route(propertyId: String? = null): String {
+            val id = propertyId?.takeIf { it.isNotBlank() }
+            return if (id == null) "reminders" else "reminders?propertyId=${Uri.encode(id)}"
+        }
     }
 
     data object Stats : Destination("stats?propertyId={propertyId}") {
@@ -275,7 +285,8 @@ fun RealEstateNavigation() {
                 onOpenDetails = { navController.navigate(Destination.PropertyInfo.route(propertyId)) },
                 onOpenStatsForProperty = { navController.navigate(Destination.Stats.route(propertyId)) },
                 onOpenBills = { navController.navigate(Destination.PropertyReadings.route(propertyId)) },
-                onOpenTransactions = { navController.navigate(Destination.PropertyTransactions.route(propertyId)) }
+                onOpenTransactions = { navController.navigate(Destination.PropertyTransactions.route(propertyId)) },
+                onOpenReminders = { navController.navigate(Destination.Reminders.route(propertyId)) }
             )
         }
 
@@ -348,6 +359,22 @@ fun RealEstateNavigation() {
 
             PropertyReadingsScreen(
                 propertyId = propertyId,
+                onBack = { navController.popBackStack() }
+            )
+        }
+
+        composable(
+            route = Destination.Reminders.route,
+            arguments = listOf(
+                navArgument(Destination.Reminders.ARG_PROPERTY_ID) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { backStackEntry ->
+            RemindersScreen(
+                propertyId = backStackEntry.arguments?.getString(Destination.Reminders.ARG_PROPERTY_ID),
                 onBack = { navController.popBackStack() }
             )
         }

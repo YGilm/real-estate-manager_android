@@ -15,9 +15,10 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         PropertyPhotoEntity::class,
         ProviderWidgetEntity::class,
         WidgetFieldEntity::class,
-        FieldEntryEntity::class
+        FieldEntryEntity::class,
+        ReminderRuleEntity::class
     ],
-    version = 6,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -31,6 +32,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun providerWidgetDao(): ProviderWidgetDao
     abstract fun widgetFieldDao(): WidgetFieldDao
     abstract fun fieldEntryDao(): FieldEntryDao
+    abstract fun reminderDao(): ReminderDao
 
     companion object {
 
@@ -220,6 +222,59 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS index_field_entries_userId_fieldId_period ON field_entries(userId, fieldId, periodYear, periodMonth)"
                 )
+            }
+        }
+
+        /**
+         * 6 -> 7
+         * Локальные правила напоминаний.
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS reminders (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        userId TEXT NOT NULL,
+                        propertyId TEXT,
+                        title TEXT NOT NULL DEFAULT '',
+                        message TEXT,
+                        type TEXT NOT NULL,
+                        scheduleMode TEXT NOT NULL,
+                        oneTimeAt INTEGER,
+                        rangeStartAt INTEGER,
+                        rangeEndAt INTEGER,
+                        dayOfMonth INTEGER,
+                        rangeStartDay INTEGER,
+                        rangeEndDay INTEGER,
+                        repeatEveryDays INTEGER,
+                        offsetDays INTEGER,
+                        hour INTEGER NOT NULL DEFAULT 14,
+                        minute INTEGER NOT NULL DEFAULT 0,
+                        enabled INTEGER NOT NULL,
+                        nextTriggerAt INTEGER NOT NULL,
+                        lastFiredAt INTEGER,
+                        createdAt INTEGER NOT NULL,
+                        updatedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_reminders_userId_nextTriggerAt ON reminders(userId, nextTriggerAt)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_reminders_userId_propertyId ON reminders(userId, propertyId)"
+                )
+            }
+        }
+
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE reminders ADD COLUMN title TEXT NOT NULL DEFAULT ''")
+                db.execSQL("ALTER TABLE reminders ADD COLUMN message TEXT")
+                db.execSQL("ALTER TABLE reminders ADD COLUMN oneTimeAt INTEGER")
+                db.execSQL("ALTER TABLE reminders ADD COLUMN rangeStartAt INTEGER")
+                db.execSQL("ALTER TABLE reminders ADD COLUMN rangeEndAt INTEGER")
             }
         }
     }

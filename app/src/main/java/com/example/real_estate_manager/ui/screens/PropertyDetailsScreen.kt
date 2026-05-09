@@ -22,6 +22,7 @@ import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.BarChart
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.outlined.Apartment
 import androidx.compose.material3.Card
@@ -66,7 +67,8 @@ fun PropertyDetailsScreen(
     onOpenDetails: () -> Unit,
     onOpenStatsForProperty: () -> Unit,
     onOpenBills: () -> Unit,
-    onOpenTransactions: () -> Unit
+    onOpenTransactions: () -> Unit,
+    onOpenReminders: () -> Unit
 ) {
     val properties by vm.properties.collectAsState()
     val property = properties.firstOrNull { it.id == propertyId }
@@ -238,6 +240,16 @@ fun PropertyDetailsScreen(
                     Spacer(Modifier.size(8.dp))
                     Text("Статистика")
                 }
+            }
+
+            ElevatedButton(
+                onClick = onOpenReminders,
+                modifier = Modifier.fillMaxWidth(),
+                contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
+            ) {
+                Icon(Icons.Filled.Notifications, contentDescription = null)
+                Spacer(Modifier.size(8.dp))
+                Text("Напоминания")
             }
 
             // Статистика за год

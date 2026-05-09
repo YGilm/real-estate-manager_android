@@ -101,6 +101,10 @@ dependencies {
     // Для @HiltViewModel и интеграции с Compose
     kapt("androidx.hilt:hilt-compiler:1.2.0")
     implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
+    implementation("androidx.hilt:hilt-work:1.2.0")
+
+    // WorkManager (локальные напоминания)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
 
     // DataStore (сессия пользователя)
     implementation("androidx.datastore:datastore-preferences:1.1.1")

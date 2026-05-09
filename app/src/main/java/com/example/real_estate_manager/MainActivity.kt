@@ -8,6 +8,8 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.example.real_estate_manager.auth.UserSession
+import com.example.real_estate_manager.reminders.ReminderNotifications
+import com.example.real_estate_manager.reminders.ReminderScheduler
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -17,6 +19,9 @@ class MainActivity : FragmentActivity() {
 
     @Inject
     lateinit var userSession: UserSession
+
+    @Inject
+    lateinit var reminderScheduler: ReminderScheduler
 
     private val appLifecycleObserver = LifecycleEventObserver { _, event ->
         when (event) {
@@ -38,6 +43,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        ReminderNotifications.ensureChannels(this)
+        reminderScheduler.schedule()
 
         // На всякий случай сразу проверим TTL при старте
         lifecycleScope.launch {

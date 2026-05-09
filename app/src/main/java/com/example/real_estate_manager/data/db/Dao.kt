@@ -184,3 +184,25 @@ interface FieldEntryDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertAll(list: List<FieldEntryEntity>)
 }
+
+// ---------- REMINDERS ----------
+@Dao
+interface ReminderDao {
+    @Query("SELECT * FROM reminders WHERE userId = :userId ORDER BY nextTriggerAt ASC, createdAt DESC")
+    fun observeAll(userId: String): Flow<List<ReminderRuleEntity>>
+
+    @Query("SELECT * FROM reminders WHERE userId = :userId AND propertyId = :propertyId ORDER BY nextTriggerAt ASC, createdAt DESC")
+    fun observeForProperty(userId: String, propertyId: String): Flow<List<ReminderRuleEntity>>
+
+    @Query("SELECT * FROM reminders WHERE userId = :userId AND enabled = 1 AND nextTriggerAt <= :nowMillis ORDER BY nextTriggerAt ASC")
+    suspend fun getDue(userId: String, nowMillis: Long): List<ReminderRuleEntity>
+
+    @Query("SELECT * FROM reminders WHERE userId = :userId AND id = :id LIMIT 1")
+    suspend fun getById(userId: String, id: String): ReminderRuleEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsert(rule: ReminderRuleEntity)
+
+    @Query("DELETE FROM reminders WHERE userId = :userId AND id = :id")
+    suspend fun deleteById(userId: String, id: String)
+}

@@ -8,6 +8,7 @@ import com.example.real_estate_manager.data.db.PropertyDao
 import com.example.real_estate_manager.data.db.PropertyDetailsDao
 import com.example.real_estate_manager.data.db.PropertyPhotoDao
 import com.example.real_estate_manager.data.db.ProviderWidgetDao
+import com.example.real_estate_manager.data.db.ReminderDao
 import com.example.real_estate_manager.data.db.TransactionDao
 import com.example.real_estate_manager.data.db.UserDao
 import com.example.real_estate_manager.data.db.WidgetFieldDao
@@ -32,7 +33,9 @@ object DatabaseModule {
                 AppDatabase.MIGRATION_2_3,
                 AppDatabase.MIGRATION_3_4,
                 AppDatabase.MIGRATION_4_5,
-                AppDatabase.MIGRATION_5_6
+                AppDatabase.MIGRATION_5_6,
+                AppDatabase.MIGRATION_6_7,
+                AppDatabase.MIGRATION_7_8
             )
             .build()
 
@@ -45,4 +48,5 @@ object DatabaseModule {
     @Provides fun provideProviderWidgetDao(db: AppDatabase): ProviderWidgetDao = db.providerWidgetDao()
     @Provides fun provideWidgetFieldDao(db: AppDatabase): WidgetFieldDao = db.widgetFieldDao()
     @Provides fun provideFieldEntryDao(db: AppDatabase): FieldEntryDao = db.fieldEntryDao()
+    @Provides fun provideReminderDao(db: AppDatabase): ReminderDao = db.reminderDao()
 }
