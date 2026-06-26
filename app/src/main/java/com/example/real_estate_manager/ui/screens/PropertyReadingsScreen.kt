@@ -61,6 +61,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import android.util.Log
 import coil.compose.AsyncImage
 import com.example.real_estate_manager.data.model.FieldEntry
 import com.example.real_estate_manager.data.model.ProviderWidget
@@ -117,6 +118,14 @@ fun PropertyReadingsScreen(
     val fieldsByWidget = uiState.fields.groupBy { it.widgetId }
     val entriesByField = uiState.entries.groupBy { it.fieldId }
 
+    LaunchedEffect(uiState) {
+        Log.d(
+            "PropertyDetails",
+            "Readings Compose propertyId=$propertyId widgets=${uiState.widgets.size} " +
+                "fields=${uiState.fields.size} entries=${uiState.entries.size}"
+        )
+    }
+
     if (addDialogOpen) {
         AlertDialog(
             onDismissRequest = { addDialogOpen = false },
@@ -124,7 +133,7 @@ fun PropertyReadingsScreen(
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     TemplateOptionCard(
-                        title = "Мосэнерго",
+                        title = "Мосэнергосбыт",
                         subtitle = "Счётчики электроэнергии"
                     ) {
                         addDialogOpen = false
@@ -167,7 +176,7 @@ fun PropertyReadingsScreen(
     if (mosenergoDialogOpen) {
         AlertDialog(
             onDismissRequest = { mosenergoDialogOpen = false },
-            title = { Text("Мосэнерго") },
+            title = { Text("Мосэнергосбыт") },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     TemplateOptionCard(
@@ -685,6 +694,12 @@ fun PropertyReadingsScreen(
                 ) {
                     items(uiState.widgets, key = { it.id }) { widget ->
                         val widgetFields = fieldsByWidget[widget.id].orEmpty().sortedBy { it.sortOrder }
+                        val providerSyncStatus = providerSyncStatusText(widget)
+                        val currentSyncEntry = widgetFields
+                            .asSequence()
+                            .flatMap { field -> entriesByField[field.id].orEmpty().asSequence() }
+                            .filter { it.periodYear == now.year && it.periodMonth == now.monthValue }
+                            .firstOrNull { it.lastSyncError != null || it.syncStatus != "SYNCED" }
                         Card(
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(16.dp),
@@ -704,6 +719,28 @@ fun PropertyReadingsScreen(
                                 ) {
                                     Column {
                                         Text(widget.title, style = MaterialTheme.typography.titleMedium)
+                                        providerSyncStatus?.let { status ->
+                                            Text(
+                                                text = status,
+                                                color = if (widget.lastSyncError != null) {
+                                                    MaterialTheme.colorScheme.error
+                                                } else {
+                                                    MaterialTheme.colorScheme.primary
+                                                },
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
+                                        currentSyncEntry?.let { entry ->
+                                            Text(
+                                                text = readingSyncStatusText(entry),
+                                                color = if (entry.lastSyncError != null) {
+                                                    MaterialTheme.colorScheme.error
+                                                } else {
+                                                    MaterialTheme.colorScheme.primary
+                                                },
+                                                style = MaterialTheme.typography.bodySmall
+                                            )
+                                        }
                                     }
                                     Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                         IconButton(onClick = {
@@ -831,6 +868,30 @@ private fun formatFieldValue(field: WidgetField, entry: FieldEntry?): String {
         WidgetFieldType.IMAGE -> if (entry.valueText.isNullOrBlank()) "—" else "Есть"
     }
 }
+
+private fun readingSyncStatusText(entry: FieldEntry): String =
+    if (entry.lastSyncError != null) {
+        "Ошибка синхронизации"
+    } else {
+        when (entry.syncStatus) {
+            "PENDING_CREATE",
+            "PENDING_UPDATE",
+            "PENDING_DELETE" -> "Ожидает синхронизации"
+            else -> ""
+        }
+    }
+
+private fun providerSyncStatusText(widget: ProviderWidget): String? =
+    if (widget.lastSyncError != null) {
+        "Ошибка синхронизации"
+    } else {
+        when (widget.syncStatus) {
+            "PENDING_CREATE",
+            "PENDING_UPDATE",
+            "PENDING_DELETE" -> "Ожидает синхронизации"
+            else -> null
+        }
+    }
 
 private fun findPreviousEntry(entries: List<FieldEntry>, year: Int, month: Int): FieldEntry? {
     val currentKey = year * 100 + month

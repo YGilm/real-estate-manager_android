@@ -15,5 +15,8 @@ data class ProviderWidget(
     val title: String,
     val templateKey: String,
     val createdAt: Long = System.currentTimeMillis(),
-    val archived: Boolean = false
+    val archived: Boolean = false,
+    val syncStatus: String = "SYNCED",
+    val lastSyncError: String? = null,
+    val lastSyncAttemptAt: Long? = null
 )

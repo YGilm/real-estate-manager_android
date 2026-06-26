@@ -1,5 +1,6 @@
 package com.example.real_estate_manager.ui
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.real_estate_manager.auth.UserSession
@@ -10,6 +11,7 @@ import com.example.real_estate_manager.data.model.ProviderWidgetType
 import com.example.real_estate_manager.data.model.WidgetField
 import com.example.real_estate_manager.data.model.WidgetFieldType
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -130,6 +132,8 @@ class PropertyReadingsViewModel @Inject constructor(
         )
 
     private val propertyIdFlow = MutableStateFlow<String?>(null)
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage
 
     fun bind(propertyId: String) {
         if (propertyIdFlow.value != propertyId) {
@@ -148,6 +152,11 @@ class PropertyReadingsViewModel @Inject constructor(
                         repo.widgetFields(uid, pid),
                         repo.fieldEntries(uid, pid)
                     ) { widgets, fields, entries ->
+                        Log.d(
+                            "PropertyDetails",
+                            "Readings VM propertyId=$pid widgets=${widgets.size} fields=${fields.size} entries=${entries.size} " +
+                                "widgetData=$widgets fieldData=$fields entryData=$entries"
+                        )
                         ReadingsUiState(widgets = widgets, fields = fields, entries = entries)
                     }
                 }
@@ -181,7 +190,7 @@ class PropertyReadingsViewModel @Inject constructor(
             )
         }
 
-        viewModelScope.launch {
+        launchSafely {
             repo.addProviderWidget(uid, widget, fields)
         }
     }
@@ -207,7 +216,7 @@ class PropertyReadingsViewModel @Inject constructor(
                 sortOrder = field.sortOrder
             )
         }
-        viewModelScope.launch {
+        launchSafely {
             repo.addProviderWidget(uid, widget, mapped)
         }
     }
@@ -229,14 +238,14 @@ class PropertyReadingsViewModel @Inject constructor(
             )
         }
 
-        viewModelScope.launch {
+        launchSafely {
             repo.upsertFieldEntries(uid, entries)
         }
     }
 
     fun updateWidget(widgetId: String, title: String, fields: List<CustomWidgetField>?) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.updateProviderWidgetTitle(uid, widgetId, title)
             if (fields != null) {
                 val mapped = fields.map { field ->
@@ -256,8 +265,23 @@ class PropertyReadingsViewModel @Inject constructor(
 
     fun archiveWidget(widgetId: String) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.setProviderWidgetArchived(uid, widgetId, true)
+        }
+    }
+
+    fun consumeErrorMessage() {
+        _errorMessage.value = null
+    }
+
+    private fun launchSafely(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                _errorMessage.value = error.toUiErrorMessage()
+            }
         }
     }
 }

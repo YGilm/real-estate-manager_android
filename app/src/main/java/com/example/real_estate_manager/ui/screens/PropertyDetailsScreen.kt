@@ -55,6 +55,7 @@ import com.example.real_estate_manager.data.model.TxType
 import com.example.real_estate_manager.ui.RealEstateViewModel
 import com.example.real_estate_manager.ui.util.copyUriToAppStorage
 import android.net.Uri
+import android.util.Log
 import java.time.LocalDate
 import java.util.Locale
 
@@ -74,6 +75,15 @@ fun PropertyDetailsScreen(
     val property = properties.firstOrNull { it.id == propertyId }
     val details by vm.propertyDetails(propertyId).collectAsState(initial = null)
     val context = LocalContext.current
+
+    LaunchedEffect(property, details) {
+        Log.d(
+            "PropertyDetails",
+            "Compose propertyId=$propertyId name=${property?.name} squareMeters=${property?.squareMeters} " +
+                "pricePerM2=${property?.pricePerM2} monthlyRent=${property?.monthlyRent} " +
+                "leaseFrom=${property?.leaseFrom} leaseTo=${property?.leaseTo} detailsArea=${details?.areaSqm}"
+        )
+    }
 
     LaunchedEffect(property?.coverUri) {
         val uri = property?.coverUri ?: return@LaunchedEffect
@@ -171,10 +181,17 @@ fun PropertyDetailsScreen(
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
-                                val areaText = formatArea(details?.areaSqm)
+                                val areaText = formatArea(property?.squareMeters, details?.areaSqm)
                                 if (areaText != null) {
                                     Text(
                                         text = "Метраж: $areaText",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                property?.pricePerM2?.takeIf { it > 0.0 }?.let { price ->
+                                    Text(
+                                        text = "Ставка за м²: ${moneyFormatPlain(price)} ₽",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -184,6 +201,20 @@ fun PropertyDetailsScreen(
                                         text = property?.address.orEmpty(),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                propertyDetailsSyncStatusText(
+                                    syncStatus = details?.syncStatus,
+                                    lastSyncError = details?.lastSyncError
+                                )?.let { statusText ->
+                                    Text(
+                                        text = statusText,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (details?.lastSyncError != null) {
+                                            MaterialTheme.colorScheme.error
+                                        } else {
+                                            MaterialTheme.colorScheme.primary
+                                        }
                                     )
                                 }
                             }
@@ -384,9 +415,21 @@ private fun moneyFormatPlain(value: Double): String {
         .replace('\u00A0', ' ')
 }
 
-private fun formatArea(areaSqm: String?): String? {
-    val v = areaSqm?.trim()?.replace(',', '.')?.toDoubleOrNull() ?: return null
+private fun formatArea(squareMeters: Double?, areaSqm: String?): String? {
+    val v = squareMeters ?: areaSqm?.trim()?.replace(',', '.')?.toDoubleOrNull() ?: return null
     if (v == 0.0) return null
     val s = String.format(Locale("ru", "RU"), "%.2f", v)
     return "$s м²"
 }
+
+private fun propertyDetailsSyncStatusText(syncStatus: String?, lastSyncError: String?): String? =
+    if (lastSyncError != null) {
+        "Ошибка синхронизации"
+    } else {
+        when (syncStatus) {
+            "PENDING_CREATE",
+            "PENDING_UPDATE",
+            "PENDING_DELETE" -> "Ожидает синхронизации"
+            else -> null
+        }
+    }

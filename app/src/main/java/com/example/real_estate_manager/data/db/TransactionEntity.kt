@@ -1,6 +1,8 @@
 package com.example.real_estate_manager.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
@@ -8,7 +10,10 @@ import androidx.room.PrimaryKey
  *
  * attachment* — опциональные поля (счёт/чек), чтобы не ломать старые данные.
  */
-@Entity(tableName = "transactions")
+@Entity(
+    tableName = "transactions",
+    indices = [Index(value = ["userId", "syncStatus"])]
+)
 data class TransactionEntity(
     @PrimaryKey val id: String,
     val userId: String,
@@ -25,5 +30,11 @@ data class TransactionEntity(
     /** Отображаемое имя файла */
     val attachmentName: String? = null,
     /** MIME-тип (например application/pdf, image/jpeg) */
-    val attachmentMime: String? = null
+    val attachmentMime: String? = null,
+
+    /** SYNCED, PENDING_CREATE, PENDING_UPDATE, PENDING_DELETE. */
+    @ColumnInfo(defaultValue = "'SYNCED'")
+    val syncStatus: String = "SYNCED",
+    val lastSyncError: String? = null,
+    val lastSyncAttemptAt: Long? = null
 )

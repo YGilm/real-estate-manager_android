@@ -43,6 +43,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -57,6 +58,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.real_estate_manager.data.model.Transaction
+import com.example.real_estate_manager.data.model.TransactionSyncStatus
 import com.example.real_estate_manager.data.model.TxType
 import com.example.real_estate_manager.ui.RealEstateViewModel
 import com.example.real_estate_manager.ui.components.EditTransactionDialog
@@ -72,8 +74,16 @@ fun PropertyTransactionsScreen(
     onBack: () -> Unit,
 ) {
     val transactions by vm.transactions.collectAsState()
+    val uiMessage by vm.uiMessage.collectAsState()
+    val context = LocalContext.current
     val propertyTransactions = remember(transactions, propertyId) {
         transactions.filter { it.propertyId == propertyId }
+    }
+
+    LaunchedEffect(uiMessage) {
+        val message = uiMessage ?: return@LaunchedEffect
+        Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        vm.consumeUiMessage()
     }
 
     var currentDetails by remember(propertyId) { mutableStateOf<Transaction?>(null) }
@@ -93,7 +103,7 @@ fun PropertyTransactionsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Транзакции") },
+                title = { Text("Платежи") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Назад")
@@ -117,7 +127,7 @@ fun PropertyTransactionsScreen(
                     )
                 }
             ) {
-                Icon(Icons.Filled.Add, contentDescription = "Добавить транзакцию")
+                Icon(Icons.Filled.Add, contentDescription = "Добавить платеж")
             }
         }
     ) { innerPadding ->
@@ -138,7 +148,7 @@ fun PropertyTransactionsScreen(
         ) {
             if (propertyTransactions.isEmpty()) {
                 Text(
-                    text = "На данный момент транзакций нет",
+                    text = "Нет платежей.",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -262,7 +272,7 @@ private fun TransactionDetailsSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "Транзакция",
+                    text = "Платеж",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     modifier = Modifier.weight(1f)
@@ -464,6 +474,27 @@ private fun TransactionRow(
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
                     color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+            val syncText = when (transaction.syncStatus) {
+                TransactionSyncStatus.SYNCED -> null
+                TransactionSyncStatus.PENDING_CREATE,
+                TransactionSyncStatus.PENDING_UPDATE,
+                TransactionSyncStatus.PENDING_DELETE -> "Ожидает синхронизации"
+            }
+            if (syncText != null || !transaction.lastSyncError.isNullOrBlank()) {
+                Text(
+                    text = if (transaction.lastSyncError.isNullOrBlank()) {
+                        syncText ?: "Синхронизировано"
+                    } else {
+                        "Ошибка синхронизации"
+                    },
+                    style = MaterialTheme.typography.labelMedium,
+                    color = if (transaction.lastSyncError.isNullOrBlank()) {
+                        MaterialTheme.colorScheme.primary
+                    } else {
+                        MaterialTheme.colorScheme.error
+                    }
                 )
             }
         }

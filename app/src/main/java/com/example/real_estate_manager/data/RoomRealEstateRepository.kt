@@ -23,6 +23,7 @@ import com.example.real_estate_manager.data.model.PropertyDetails
 import com.example.real_estate_manager.data.model.PropertyPhoto
 import com.example.real_estate_manager.data.model.ProviderWidget
 import com.example.real_estate_manager.data.model.Transaction
+import com.example.real_estate_manager.data.model.TransactionSyncStatus
 import com.example.real_estate_manager.data.model.TxType
 import com.example.real_estate_manager.data.model.WidgetField
 import kotlinx.coroutines.Dispatchers
@@ -152,8 +153,13 @@ class RoomRealEstateRepository @Inject constructor(
                 userId = userId,
                 propertyId = propertyId,
                 uri = uri,
+                imageRef = uri,
+                photoType = null,
+                sortOrder = index,
                 // более новые фото — больше createdAt, они будут выше
-                createdAt = baseTime + index
+                createdAt = baseTime + index,
+                remoteCreatedAt = null,
+                updatedAt = null
             )
         }
         propertyPhotoDao.upsertAll(entities)
@@ -233,7 +239,10 @@ class RoomRealEstateRepository @Inject constructor(
             note = note,
             attachmentUri = attachmentUri,
             attachmentName = attachmentName,
-            attachmentMime = attachmentMime
+            attachmentMime = attachmentMime,
+            syncStatus = "SYNCED",
+            lastSyncError = null,
+            lastSyncAttemptAt = null
         )
         transactionDao.upsert(entity)
     }
@@ -372,7 +381,9 @@ private fun PropertyEntity.toModel(): Property =
         id = id,
         name = name,
         address = address,
+        squareMeters = squareMeters,
         monthlyRent = monthlyRent,
+        pricePerM2 = pricePerM2,
         coverUri = coverUri,
         leaseFrom = leaseFrom,
         leaseTo = leaseTo
@@ -384,17 +395,25 @@ private fun Property.toEntity(userId: String): PropertyEntity =
         userId = userId,
         name = name,
         address = address,
+        squareMeters = squareMeters,
         monthlyRent = monthlyRent,
+        pricePerM2 = pricePerM2,
         coverUri = coverUri,
         leaseFrom = leaseFrom,
-        leaseTo = leaseTo
+        leaseTo = leaseTo,
+        description = null,
+        createdAt = null,
+        updatedAt = null
     )
 
 private fun PropertyDetailsEntity.toModel(): PropertyDetails =
     PropertyDetails(
         propertyId = propertyId,
         description = description,
-        areaSqm = areaSqm
+        areaSqm = areaSqm,
+        syncStatus = syncStatus,
+        lastSyncError = lastSyncError,
+        lastSyncAttemptAt = lastSyncAttemptAt
     )
 
 private fun PropertyPhotoEntity.toModel(): PropertyPhoto =
@@ -414,8 +433,14 @@ private fun TransactionEntity.toModel(): Transaction =
         note = note,
         attachmentUri = attachmentUri,
         attachmentName = attachmentName,
-        attachmentMime = attachmentMime
+        attachmentMime = attachmentMime,
+        syncStatus = syncStatus.toTransactionSyncStatus(),
+        lastSyncError = lastSyncError,
+        lastSyncAttemptAt = lastSyncAttemptAt
     )
+
+private fun String.toTransactionSyncStatus(): TransactionSyncStatus =
+    runCatching { TransactionSyncStatus.valueOf(this) }.getOrDefault(TransactionSyncStatus.SYNCED)
 
 private fun AttachmentEntity.toModel(): Attachment =
     Attachment(

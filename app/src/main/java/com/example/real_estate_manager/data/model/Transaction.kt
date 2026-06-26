@@ -6,6 +6,8 @@ import java.util.UUID
 
 enum class TxType { INCOME, EXPENSE }
 
+enum class TransactionSyncStatus { SYNCED, PENDING_CREATE, PENDING_UPDATE, PENDING_DELETE }
+
 /**
  * Доменная модель транзакции.
  *
@@ -27,7 +29,10 @@ data class Transaction(
 
     val attachmentUri: String? = null,
     val attachmentName: String? = null,
-    val attachmentMime: String? = null
+    val attachmentMime: String? = null,
+    val syncStatus: TransactionSyncStatus = TransactionSyncStatus.SYNCED,
+    val lastSyncError: String? = null,
+    val lastSyncAttemptAt: Long? = null
 )
 
 /**

@@ -16,5 +16,10 @@ data class PropertyPhotoEntity(
     val propertyId: String,
     /** content://... (через SAF + takePersistableUriPermission) */
     val uri: String,
-    val createdAt: Long
+    val imageRef: String?,
+    val photoType: String?,
+    val sortOrder: Int,
+    val createdAt: Long,
+    val remoteCreatedAt: String?,
+    val updatedAt: String?
 )

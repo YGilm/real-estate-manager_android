@@ -8,5 +8,7 @@ data class FieldEntry(
     val valueNumber: Double? = null,
     val valueText: String? = null,
     val status: String? = null,
-    val createdAt: Long
+    val createdAt: Long,
+    val syncStatus: String = "SYNCED",
+    val lastSyncError: String? = null
 )

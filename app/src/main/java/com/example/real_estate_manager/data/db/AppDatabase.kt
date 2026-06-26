@@ -17,9 +17,13 @@ import androidx.sqlite.db.SupportSQLiteDatabase
         WidgetFieldEntity::class,
         FieldEntryEntity::class,
         ReminderRuleEntity::class,
-        NotificationEntity::class
+        NotificationEntity::class,
+        PropertyDocumentEntity::class,
+        UtilityProviderEntity::class,
+        CustomProviderFieldEntity::class,
+        MeterReadingEntity::class
     ],
-    version = 9,
+    version = 16,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -35,6 +39,10 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun fieldEntryDao(): FieldEntryDao
     abstract fun reminderDao(): ReminderDao
     abstract fun notificationDao(): NotificationDao
+    abstract fun propertyDocumentDao(): PropertyDocumentDao
+    abstract fun utilityProviderDao(): UtilityProviderDao
+    abstract fun customProviderFieldDao(): CustomProviderFieldDao
+    abstract fun meterReadingDao(): MeterReadingDao
 
     companion object {
 
@@ -302,6 +310,288 @@ abstract class AppDatabase : RoomDatabase() {
                 )
                 db.execSQL(
                     "CREATE INDEX IF NOT EXISTS index_notifications_userId_propertyId ON notifications(userId, propertyId)"
+                )
+            }
+        }
+
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                runCatching { db.execSQL("ALTER TABLE properties ADD COLUMN squareMeters REAL") }
+                runCatching { db.execSQL("ALTER TABLE properties ADD COLUMN pricePerM2 REAL") }
+                runCatching { db.execSQL("ALTER TABLE properties ADD COLUMN description TEXT") }
+                runCatching { db.execSQL("ALTER TABLE properties ADD COLUMN createdAt TEXT") }
+                runCatching { db.execSQL("ALTER TABLE properties ADD COLUMN updatedAt TEXT") }
+
+                runCatching { db.execSQL("ALTER TABLE property_photos ADD COLUMN imageRef TEXT") }
+                runCatching { db.execSQL("ALTER TABLE property_photos ADD COLUMN photoType TEXT") }
+                runCatching { db.execSQL("ALTER TABLE property_photos ADD COLUMN sortOrder INTEGER NOT NULL DEFAULT 0") }
+                runCatching { db.execSQL("ALTER TABLE property_photos ADD COLUMN remoteCreatedAt TEXT") }
+                runCatching { db.execSQL("ALTER TABLE property_photos ADD COLUMN updatedAt TEXT") }
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS property_documents (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        userId TEXT NOT NULL,
+                        propertyId TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        fileRef TEXT NOT NULL,
+                        mimeType TEXT NOT NULL,
+                        documentType TEXT,
+                        uploadedAt TEXT,
+                        createdAt TEXT,
+                        updatedAt TEXT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_property_documents_userId_propertyId ON property_documents(userId, propertyId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_property_documents_userId_propertyId_documentType ON property_documents(userId, propertyId, documentType)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS utility_providers (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        userId TEXT NOT NULL,
+                        propertyId TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        providerType TEXT NOT NULL,
+                        mosenergoMode TEXT,
+                        configurationJson TEXT NOT NULL,
+                        active INTEGER NOT NULL,
+                        schemaJson TEXT NOT NULL,
+                        createdAt TEXT,
+                        updatedAt TEXT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_utility_providers_userId_propertyId ON utility_providers(userId, propertyId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_utility_providers_userId_propertyId_active ON utility_providers(userId, propertyId, active)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_utility_providers_userId_propertyId_providerType ON utility_providers(userId, propertyId, providerType)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS custom_provider_fields (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        userId TEXT NOT NULL,
+                        providerId TEXT NOT NULL,
+                        `key` TEXT NOT NULL,
+                        label TEXT NOT NULL,
+                        fieldType TEXT NOT NULL,
+                        unit TEXT,
+                        required INTEGER NOT NULL,
+                        sortOrder INTEGER NOT NULL,
+                        configurationJson TEXT NOT NULL,
+                        createdAt TEXT,
+                        updatedAt TEXT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_custom_provider_fields_userId_providerId ON custom_provider_fields(userId, providerId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_custom_provider_fields_userId_providerId_sortOrder ON custom_provider_fields(userId, providerId, sortOrder)")
+
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS meter_readings (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        userId TEXT NOT NULL,
+                        propertyId TEXT NOT NULL,
+                        providerId TEXT NOT NULL,
+                        readingDate TEXT NOT NULL,
+                        periodYear INTEGER NOT NULL,
+                        periodMonth INTEGER NOT NULL,
+                        valuesJson TEXT NOT NULL,
+                        consumptionJson TEXT NOT NULL,
+                        comment TEXT,
+                        createdAt TEXT,
+                        updatedAt TEXT
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_meter_readings_userId_propertyId ON meter_readings(userId, propertyId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_meter_readings_userId_providerId ON meter_readings(userId, providerId)")
+                db.execSQL("CREATE INDEX IF NOT EXISTS index_meter_readings_userId_propertyId_periodYear_periodMonth ON meter_readings(userId, propertyId, periodYear, periodMonth)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_meter_readings_userId_providerId_periodYear_periodMonth ON meter_readings(userId, providerId, periodYear, periodMonth)")
+            }
+        }
+
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                runCatching {
+                    db.execSQL("ALTER TABLE transactions ADD COLUMN syncStatus TEXT NOT NULL DEFAULT 'SYNCED'")
+                }
+                runCatching {
+                    db.execSQL("ALTER TABLE transactions ADD COLUMN lastSyncError TEXT")
+                }
+                runCatching {
+                    db.execSQL("ALTER TABLE transactions ADD COLUMN lastSyncAttemptAt INTEGER")
+                }
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_transactions_userId_syncStatus ON transactions(userId, syncStatus)"
+                )
+            }
+        }
+
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                runCatching {
+                    db.execSQL("ALTER TABLE meter_readings ADD COLUMN syncStatus TEXT NOT NULL DEFAULT 'SYNCED'")
+                }
+                runCatching {
+                    db.execSQL("ALTER TABLE meter_readings ADD COLUMN lastSyncError TEXT")
+                }
+                runCatching {
+                    db.execSQL("ALTER TABLE meter_readings ADD COLUMN lastSyncAttemptAt INTEGER")
+                }
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_meter_readings_userId_syncStatus ON meter_readings(userId, syncStatus)"
+                )
+            }
+        }
+
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                runCatching {
+                    db.execSQL("ALTER TABLE reminders ADD COLUMN syncStatus TEXT NOT NULL DEFAULT 'SYNCED'")
+                }
+                runCatching {
+                    db.execSQL("ALTER TABLE reminders ADD COLUMN lastSyncError TEXT")
+                }
+                runCatching {
+                    db.execSQL("ALTER TABLE reminders ADD COLUMN lastSyncAttemptAt INTEGER")
+                }
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_reminders_userId_syncStatus ON reminders(userId, syncStatus)"
+                )
+            }
+        }
+
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                runCatching {
+                    db.execSQL("ALTER TABLE property_details ADD COLUMN syncStatus TEXT NOT NULL DEFAULT 'SYNCED'")
+                }
+                runCatching {
+                    db.execSQL("ALTER TABLE property_details ADD COLUMN lastSyncError TEXT")
+                }
+                runCatching {
+                    db.execSQL("ALTER TABLE property_details ADD COLUMN lastSyncAttemptAt INTEGER")
+                }
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_property_details_userId_syncStatus ON property_details(userId, syncStatus)"
+                )
+            }
+        }
+
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                runCatching {
+                    db.execSQL("ALTER TABLE utility_providers ADD COLUMN syncStatus TEXT NOT NULL DEFAULT 'SYNCED'")
+                }
+                runCatching {
+                    db.execSQL("ALTER TABLE utility_providers ADD COLUMN lastSyncError TEXT")
+                }
+                runCatching {
+                    db.execSQL("ALTER TABLE utility_providers ADD COLUMN lastSyncAttemptAt INTEGER")
+                }
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_utility_providers_userId_syncStatus ON utility_providers(userId, syncStatus)"
+                )
+
+                runCatching {
+                    db.execSQL("ALTER TABLE custom_provider_fields ADD COLUMN syncStatus TEXT NOT NULL DEFAULT 'SYNCED'")
+                }
+                runCatching {
+                    db.execSQL("ALTER TABLE custom_provider_fields ADD COLUMN lastSyncError TEXT")
+                }
+                runCatching {
+                    db.execSQL("ALTER TABLE custom_provider_fields ADD COLUMN lastSyncAttemptAt INTEGER")
+                }
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_custom_provider_fields_userId_syncStatus ON custom_provider_fields(userId, syncStatus)"
+                )
+            }
+        }
+
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS notifications_new (
+                        id TEXT NOT NULL PRIMARY KEY,
+                        userId TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        message TEXT,
+                        type TEXT NOT NULL,
+                        relatedEntityId TEXT,
+                        relatedEntityType TEXT,
+                        isRead INTEGER NOT NULL,
+                        createdAt INTEGER NOT NULL,
+                        readAt INTEGER,
+                        actionPayload TEXT,
+                        syncStatus TEXT NOT NULL,
+                        lastSyncError TEXT,
+                        updatedAt INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO notifications_new (
+                        id,
+                        userId,
+                        title,
+                        message,
+                        type,
+                        relatedEntityId,
+                        relatedEntityType,
+                        isRead,
+                        createdAt,
+                        readAt,
+                        actionPayload,
+                        syncStatus,
+                        lastSyncError,
+                        updatedAt
+                    )
+                    SELECT
+                        id,
+                        userId,
+                        title,
+                        message,
+                        CASE
+                            WHEN ruleId IS NOT NULL AND ruleId != '' THEN 'REMINDER'
+                            WHEN propertyId IS NOT NULL AND propertyId != '' THEN 'PROPERTY'
+                            ELSE 'SYSTEM'
+                        END,
+                        CASE
+                            WHEN ruleId IS NOT NULL AND ruleId != '' THEN ruleId
+                            WHEN propertyId IS NOT NULL AND propertyId != '' THEN propertyId
+                            ELSE NULL
+                        END,
+                        CASE
+                            WHEN ruleId IS NOT NULL AND ruleId != '' THEN 'REMINDER'
+                            WHEN propertyId IS NOT NULL AND propertyId != '' THEN 'PROPERTY'
+                            ELSE NULL
+                        END,
+                        CASE WHEN isActive = 0 THEN 1 ELSE 0 END,
+                        createdAt,
+                        CASE WHEN isActive = 0 THEN deactivatedAt ELSE NULL END,
+                        NULL,
+                        'SYNCED',
+                        NULL,
+                        createdAt
+                    FROM notifications
+                    """.trimIndent()
+                )
+                db.execSQL("DROP TABLE notifications")
+                db.execSQL("ALTER TABLE notifications_new RENAME TO notifications")
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_notifications_userId_isRead_createdAt ON notifications(userId, isRead, createdAt)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_notifications_userId_relatedEntityType_relatedEntityId ON notifications(userId, relatedEntityType, relatedEntityId)"
+                )
+                db.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_notifications_userId_type_createdAt ON notifications(userId, type, createdAt)"
                 )
             }
         }

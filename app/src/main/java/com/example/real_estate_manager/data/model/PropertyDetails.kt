@@ -4,5 +4,8 @@ data class PropertyDetails(
     val propertyId: String,
     val description: String?,
     /** "45.50" */
-    val areaSqm: String?
+    val areaSqm: String?,
+    val syncStatus: String = "SYNCED",
+    val lastSyncError: String? = null,
+    val lastSyncAttemptAt: Long? = null
 )

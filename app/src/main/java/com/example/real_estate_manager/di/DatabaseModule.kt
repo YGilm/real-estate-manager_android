@@ -4,7 +4,10 @@ import android.content.Context
 import androidx.room.Room
 import com.example.real_estate_manager.data.db.AppDatabase
 import com.example.real_estate_manager.data.db.AttachmentDao
+import com.example.real_estate_manager.data.db.CustomProviderFieldDao
+import com.example.real_estate_manager.data.db.MeterReadingDao
 import com.example.real_estate_manager.data.db.PropertyDao
+import com.example.real_estate_manager.data.db.PropertyDocumentDao
 import com.example.real_estate_manager.data.db.PropertyDetailsDao
 import com.example.real_estate_manager.data.db.PropertyPhotoDao
 import com.example.real_estate_manager.data.db.ProviderWidgetDao
@@ -14,6 +17,7 @@ import com.example.real_estate_manager.data.db.UserDao
 import com.example.real_estate_manager.data.db.WidgetFieldDao
 import com.example.real_estate_manager.data.db.FieldEntryDao
 import com.example.real_estate_manager.data.db.NotificationDao
+import com.example.real_estate_manager.data.db.UtilityProviderDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -37,7 +41,14 @@ object DatabaseModule {
                 AppDatabase.MIGRATION_5_6,
                 AppDatabase.MIGRATION_6_7,
                 AppDatabase.MIGRATION_7_8,
-                AppDatabase.MIGRATION_8_9
+                AppDatabase.MIGRATION_8_9,
+                AppDatabase.MIGRATION_9_10,
+                AppDatabase.MIGRATION_10_11,
+                AppDatabase.MIGRATION_11_12,
+                AppDatabase.MIGRATION_12_13,
+                AppDatabase.MIGRATION_13_14,
+                AppDatabase.MIGRATION_14_15,
+                AppDatabase.MIGRATION_15_16
             )
             .build()
 
@@ -52,4 +63,8 @@ object DatabaseModule {
     @Provides fun provideFieldEntryDao(db: AppDatabase): FieldEntryDao = db.fieldEntryDao()
     @Provides fun provideReminderDao(db: AppDatabase): ReminderDao = db.reminderDao()
     @Provides fun provideNotificationDao(db: AppDatabase): NotificationDao = db.notificationDao()
+    @Provides fun providePropertyDocumentDao(db: AppDatabase): PropertyDocumentDao = db.propertyDocumentDao()
+    @Provides fun provideUtilityProviderDao(db: AppDatabase): UtilityProviderDao = db.utilityProviderDao()
+    @Provides fun provideCustomProviderFieldDao(db: AppDatabase): CustomProviderFieldDao = db.customProviderFieldDao()
+    @Provides fun provideMeterReadingDao(db: AppDatabase): MeterReadingDao = db.meterReadingDao()
 }

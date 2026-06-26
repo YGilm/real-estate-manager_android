@@ -4,20 +4,25 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.real_estate_manager.auth.UserSession
 import com.example.real_estate_manager.data.RealEstateRepository
+import com.example.real_estate_manager.data.StatisticsRepository
 import com.example.real_estate_manager.data.model.Attachment
 import com.example.real_estate_manager.data.model.Property
 import com.example.real_estate_manager.data.model.PropertyDetails
 import com.example.real_estate_manager.data.model.PropertyPhoto
 import com.example.real_estate_manager.data.model.Transaction
 import com.example.real_estate_manager.data.model.TxType
+import com.example.real_estate_manager.network.dto.StatisticsDto
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.util.UUID
@@ -27,6 +32,7 @@ import javax.inject.Inject
 @OptIn(ExperimentalCoroutinesApi::class)
 class RealEstateViewModel @Inject constructor(
     private val repo: RealEstateRepository,
+    private val statisticsRepository: StatisticsRepository,
     session: UserSession
 ) : ViewModel() {
 
@@ -36,11 +42,14 @@ class RealEstateViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5_000),
             initialValue = null
         )
+    private val refreshTrigger = MutableStateFlow(0)
 
     val properties: StateFlow<List<Property>> =
         userIdFlow
+            .combine(refreshTrigger) { uid, refresh -> uid to refresh }
             .flatMapLatest { uid ->
-                if (uid == null) flowOf(emptyList()) else repo.properties(uid)
+                val userId = uid.first
+                if (userId == null) flowOf(emptyList()) else repo.properties(userId)
             }
             .stateIn(
                 scope = viewModelScope,
@@ -50,14 +59,33 @@ class RealEstateViewModel @Inject constructor(
 
     val transactions: StateFlow<List<Transaction>> =
         userIdFlow
+            .combine(refreshTrigger) { uid, refresh -> uid to refresh }
             .flatMapLatest { uid ->
-                if (uid == null) flowOf(emptyList()) else repo.transactions(uid)
+                val userId = uid.first
+                if (userId == null) flowOf(emptyList()) else repo.transactions(userId)
             }
             .stateIn(
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5_000),
                 initialValue = emptyList()
             )
+
+    private val _backendStatistics = MutableStateFlow<StatisticsDto?>(null)
+    val backendStatistics: StateFlow<StatisticsDto?> = _backendStatistics
+    private val _uiMessage = MutableStateFlow<String?>(null)
+    val uiMessage: StateFlow<String?> = _uiMessage
+
+    fun refreshCloudData() {
+        refreshTrigger.value = refreshTrigger.value + 1
+    }
+
+    fun loadStatistics(propertyId: String?, year: Int?, month: Int? = null) {
+        launchSafely {
+            statisticsRepository.statistics(propertyId, year, month)
+                .onSuccess { _backendStatistics.value = it }
+                .onFailure { _uiMessage.value = it.toUiErrorMessage() }
+        }
+    }
 
     // --------------------------------------------------------------------
     // Property
@@ -73,7 +101,7 @@ class RealEstateViewModel @Inject constructor(
         coverUri: String? = null
     ) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             val id = UUID.randomUUID().toString()
             repo.addProperty(
                 uid,
@@ -81,6 +109,7 @@ class RealEstateViewModel @Inject constructor(
                     id = id,
                     name = name,
                     address = address,
+                    squareMeters = areaSqm?.trim()?.replace(',', '.')?.toDoubleOrNull(),
                     monthlyRent = monthlyRent,
                     leaseFrom = leaseFrom,
                     leaseTo = leaseTo,
@@ -112,7 +141,7 @@ class RealEstateViewModel @Inject constructor(
         leaseTo: String?
     ) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.updateProperty(
                 userId = uid,
                 id = id,
@@ -127,14 +156,14 @@ class RealEstateViewModel @Inject constructor(
 
     fun deleteProperty(id: String) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.deletePropertyWithRelations(uid, id)
         }
     }
 
     fun setCover(propertyId: String, coverUri: String?) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.setPropertyCover(uid, propertyId, coverUri)
         }
     }
@@ -154,7 +183,7 @@ class RealEstateViewModel @Inject constructor(
         areaSqm: String?
     ) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.upsertPropertyDetails(
                 userId = uid,
                 propertyId = propertyId,
@@ -175,28 +204,28 @@ class RealEstateViewModel @Inject constructor(
 
     fun addPropertyPhotos(propertyId: String, uris: List<String>) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.addPropertyPhotos(uid, propertyId, uris)
         }
     }
 
     fun deletePropertyPhoto(photoId: String) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.deletePropertyPhoto(uid, photoId)
         }
     }
 
     fun updatePropertyPhotoUri(photoId: String, uri: String) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.updatePropertyPhotoUri(uid, photoId, uri)
         }
     }
 
     fun reorderPropertyPhotos(propertyId: String, orderedIds: List<String>) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.reorderPropertyPhotos(
                 userId = uid,
                 propertyId = propertyId,
@@ -220,7 +249,7 @@ class RealEstateViewModel @Inject constructor(
         attachmentMime: String? = null
     ) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.addTransaction(
                 userId = uid,
                 propertyId = propertyId,
@@ -246,7 +275,7 @@ class RealEstateViewModel @Inject constructor(
         attachmentMime: String? = null
     ) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.updateTransaction(
                 userId = uid,
                 id = id,
@@ -263,7 +292,7 @@ class RealEstateViewModel @Inject constructor(
 
     fun deleteTransaction(id: String) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.deleteTransaction(uid, id)
         }
     }
@@ -284,7 +313,7 @@ class RealEstateViewModel @Inject constructor(
         uri: String
     ) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.addAttachment(
                 userId = uid,
                 propertyId = propertyId,
@@ -297,8 +326,23 @@ class RealEstateViewModel @Inject constructor(
 
     fun deleteAttachment(id: String) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             repo.deleteAttachment(uid, id)
+        }
+    }
+
+    fun consumeUiMessage() {
+        _uiMessage.value = null
+    }
+
+    private fun launchSafely(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                _uiMessage.value = error.toUiErrorMessage()
+            }
         }
     }
 }

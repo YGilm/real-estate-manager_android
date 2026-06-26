@@ -9,8 +9,13 @@ data class PropertyEntity(
     val userId: String,
     val name: String,
     val address: String?,
+    val squareMeters: Double?,
     val monthlyRent: Double?,
+    val pricePerM2: Double?,
     val coverUri: String?,
     val leaseFrom: String?,   // договор c
-    val leaseTo: String?      // договор по
+    val leaseTo: String?,      // договор по
+    val description: String?,
+    val createdAt: String?,
+    val updatedAt: String?
 )

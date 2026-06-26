@@ -30,13 +30,15 @@ import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.SegmentedButton
+import androidx.compose.material3.SegmentedButtonDefaults
+import androidx.compose.material3.SingleChoiceSegmentedButtonRow
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.rememberDatePickerState
@@ -176,7 +178,7 @@ fun EditTransactionDialog(
                 contentAlignment = androidx.compose.ui.Alignment.Center
             ) {
                 Text(
-                    text = if (isNew) "Добавление транзакции" else "Редактирование транзакции",
+                    text = if (isNew) "Добавить платеж" else "Редактировать платеж",
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     style = MaterialTheme.typography.titleMedium
@@ -186,39 +188,18 @@ fun EditTransactionDialog(
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
 
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    FilterChip(
+                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                    SegmentedButton(
                         selected = isIncome,
                         onClick = { isIncome = true },
-                        label = {
-                            Box(Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = "Доход",
-                                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
+                        shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
+                        label = { Text("Доход", maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     )
-                    FilterChip(
+                    SegmentedButton(
                         selected = !isIncome,
                         onClick = { isIncome = false },
-                        label = {
-                            Box(Modifier.fillMaxWidth()) {
-                                Text(
-                                    text = "Расход",
-                                    modifier = Modifier.align(androidx.compose.ui.Alignment.Center),
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        },
-                        modifier = Modifier.weight(1f)
+                        shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
+                        label = { Text("Расход", maxLines = 1, overflow = TextOverflow.Ellipsis) }
                     )
                 }
 

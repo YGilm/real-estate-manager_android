@@ -447,7 +447,7 @@ fun PropertyInfoScreen(
 
                     KeyValueRow(
                         label = "Метраж",
-                        value = formatArea(details?.areaSqm) ?: "—"
+                        value = formatArea(property?.squareMeters, details?.areaSqm) ?: "—"
                     )
 
                     KeyValueRow(
@@ -456,9 +456,9 @@ fun PropertyInfoScreen(
                     )
 
                     val rent = property?.monthlyRent
-                    val areaVal = parseArea(details?.areaSqm)
-                    val perSqm =
-                        if (rent != null && areaVal != null && areaVal > 0.0) rent / areaVal else null
+                    val areaVal = property?.squareMeters ?: parseArea(details?.areaSqm)
+                    val perSqm = property?.pricePerM2
+                        ?: if (rent != null && areaVal != null && areaVal > 0.0) rent / areaVal else null
 
                     KeyValueRow(
                         label = "Ставка за м²:",
@@ -501,6 +501,20 @@ fun PropertyInfoScreen(
                     if (!isEditing) {
                         val text = details?.description?.takeIf { it.isNotBlank() } ?: "—"
                         Text(text, color = MaterialTheme.colorScheme.onSurface)
+                        propertyDetailsSyncStatusText(
+                            syncStatus = details?.syncStatus,
+                            lastSyncError = details?.lastSyncError
+                        )?.let { statusText ->
+                            Text(
+                                text = statusText,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (details?.lastSyncError != null) {
+                                    MaterialTheme.colorScheme.error
+                                } else {
+                                    MaterialTheme.colorScheme.primary
+                                }
+                            )
+                        }
                     } else {
                         OutlinedTextField(
                             value = draftDescription,
@@ -750,6 +764,18 @@ private fun KeyValueRow(label: String, value: String) {
     }
 }
 
+private fun propertyDetailsSyncStatusText(syncStatus: String?, lastSyncError: String?): String? =
+    if (lastSyncError != null) {
+        "Ошибка синхронизации"
+    } else {
+        when (syncStatus) {
+            "PENDING_CREATE",
+            "PENDING_UPDATE",
+            "PENDING_DELETE" -> "Ожидает синхронизации"
+            else -> null
+        }
+    }
+
 private fun queryDisplayName(context: Context, uri: Uri): String? {
     val projection = arrayOf(OpenableColumns.DISPLAY_NAME)
     return runCatching {
@@ -841,8 +867,8 @@ private fun parseArea(areaSqm: String?): Double? {
 /**
  * Форматирование площади для отображения: "45.5" -> "45,50 м²".
  */
-private fun formatArea(areaSqm: String?): String? {
-    val v = areaSqm?.trim()?.replace(',', '.')?.toDoubleOrNull() ?: return null
+private fun formatArea(squareMeters: Double?, areaSqm: String?): String? {
+    val v = squareMeters ?: areaSqm?.trim()?.replace(',', '.')?.toDoubleOrNull() ?: return null
     if (v == 0.0) return null
     val s = String.format(Locale("ru", "RU"), "%.2f", v)
     return "$s м²"
