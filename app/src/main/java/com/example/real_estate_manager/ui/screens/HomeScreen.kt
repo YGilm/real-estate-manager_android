@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.Apartment
 import androidx.compose.material.icons.filled.Assessment
 import androidx.compose.material.icons.filled.LockReset
 import androidx.compose.material.icons.filled.Notifications
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.PieChart
 import androidx.compose.material3.AlertDialog
@@ -70,6 +71,9 @@ fun HomeScreen(
     onOpenStats: () -> Unit,
     onOpenProperties: () -> Unit,
     onOpenNotifications: () -> Unit,
+    onOpenServerSettings: () -> Unit,
+    showDeveloperTools: Boolean = false,
+    serverWarning: String? = null,
     onLogoutNavigate: () -> Unit = {}
 ) {
     val vm: RealEstateViewModel = hiltViewModel()
@@ -180,6 +184,8 @@ fun HomeScreen(
                         email = currentEmail,
                         hasActiveNotifications = activeNotificationsCount > 0,
                         onOpenNotifications = onOpenNotifications,
+                        onOpenServerSettings = onOpenServerSettings,
+                        showDeveloperTools = showDeveloperTools,
                         onLogout = {
                             authVm.logout()
                             onLogoutNavigate()
@@ -188,6 +194,25 @@ fun HomeScreen(
                             authVm.changePassword(oldPwd, newPwd, onDone)
                         }
                     )
+                }
+
+                if (!serverWarning.isNullOrBlank() &&
+                    serverWarning != "Не проверено" &&
+                    serverWarning != "Сервер найден"
+                ) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Text(
+                            text = "Сервер временно недоступен. $serverWarning",
+                            modifier = Modifier.padding(12.dp),
+                            color = MaterialTheme.colorScheme.onErrorContainer,
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                    }
                 }
 
                 // Мини-виджет: итоги за текущий месяц
@@ -320,7 +345,7 @@ fun HomeScreen(
 
                             Column {
                                 Text(
-                                    text = "Итог за текущий год",
+                                    text = "Итого за текущий год",
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.SemiBold
                                 )
@@ -414,6 +439,8 @@ private fun UserMenuButton(
     email: String?,
     hasActiveNotifications: Boolean,
     onOpenNotifications: () -> Unit,
+    onOpenServerSettings: () -> Unit,
+    showDeveloperTools: Boolean,
     onLogout: () -> Unit,
     onChangePassword: (String, String, (String?) -> Unit) -> Unit
 ) {
@@ -489,6 +516,22 @@ private fun UserMenuButton(
                     showChangePwd = true
                 }
             )
+
+            if (showDeveloperTools) {
+                DropdownMenuItem(
+                    text = { Text("Для разработчиков") },
+                    leadingIcon = {
+                        androidx.compose.material3.Icon(
+                            imageVector = Icons.Filled.Settings,
+                            contentDescription = null
+                        )
+                    },
+                    onClick = {
+                        expanded = false
+                        onOpenServerSettings()
+                    }
+                )
+            }
 
             DropdownMenuItem(
                 text = { Text("Выйти") },

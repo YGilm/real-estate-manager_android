@@ -10,6 +10,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.ProcessLifecycleOwner
 import androidx.lifecycle.lifecycleScope
 import com.example.real_estate_manager.auth.UserSession
+import com.example.real_estate_manager.navigation.NotificationNavigationTarget
 import com.example.real_estate_manager.reminders.ReminderNotifications
 import com.example.real_estate_manager.reminders.ReminderScheduler
 import dagger.hilt.android.AndroidEntryPoint
@@ -25,7 +26,7 @@ class MainActivity : FragmentActivity() {
     @Inject
     lateinit var reminderScheduler: ReminderScheduler
 
-    private val openNotificationsRequest = mutableStateOf(false)
+    private val notificationNavigationTarget = mutableStateOf<NotificationNavigationTarget?>(null)
 
     private val appLifecycleObserver = LifecycleEventObserver { _, event ->
         when (event) {
@@ -60,8 +61,8 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             RealEstateApp(
-                openNotificationsRequest = openNotificationsRequest.value,
-                onNotificationsRequestHandled = { openNotificationsRequest.value = false }
+                notificationNavigationTarget = notificationNavigationTarget.value,
+                onNotificationNavigationHandled = { notificationNavigationTarget.value = null }
             )
         }
     }
@@ -78,16 +79,31 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent?.getBooleanExtra(EXTRA_OPEN_NOTIFICATIONS, false) == true ||
-            intent?.action == ACTION_OPEN_NOTIFICATIONS
-        ) {
-            openNotificationsRequest.value = true
+        val target = notificationTargetFrom(intent)
+        if (target != null) {
+            notificationNavigationTarget.value = target
         }
     }
 
     companion object {
         const val ACTION_OPEN_NOTIFICATIONS = "com.example.real_estate_manager.OPEN_NOTIFICATIONS"
+        const val ACTION_OPEN_NOTIFICATION_DETAILS = "com.example.real_estate_manager.OPEN_NOTIFICATION_DETAILS"
         const val EXTRA_OPEN_NOTIFICATIONS = "open_notifications"
         const val EXTRA_NOTIFICATION_ID = "notification_id"
+        const val EXTRA_REMINDER_ID = "reminder_id"
+
+        fun notificationTargetFrom(intent: Intent?): NotificationNavigationTarget? =
+            when {
+                intent?.action == ACTION_OPEN_NOTIFICATION_DETAILS -> NotificationNavigationTarget(
+                    notificationId = intent.getStringExtra(EXTRA_NOTIFICATION_ID),
+                    reminderId = intent.getStringExtra(EXTRA_REMINDER_ID)
+                )
+                intent?.getBooleanExtra(EXTRA_OPEN_NOTIFICATIONS, false) == true ||
+                    intent?.action == ACTION_OPEN_NOTIFICATIONS -> NotificationNavigationTarget(
+                        notificationId = intent.getStringExtra(EXTRA_NOTIFICATION_ID),
+                        reminderId = intent.getStringExtra(EXTRA_REMINDER_ID)
+                    )
+                else -> null
+            }
     }
 }

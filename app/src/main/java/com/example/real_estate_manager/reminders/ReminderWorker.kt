@@ -3,7 +3,6 @@ package com.example.real_estate_manager.reminders
 import android.Manifest
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.app.TaskStackBuilder
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -19,7 +18,6 @@ import com.example.real_estate_manager.R
 import com.example.real_estate_manager.auth.UserSession
 import com.example.real_estate_manager.data.ReminderRepository
 import com.example.real_estate_manager.data.db.NotificationDao
-import com.example.real_estate_manager.data.db.NotificationEntity
 import com.example.real_estate_manager.data.db.PropertyDao
 import com.example.real_estate_manager.data.db.ReminderDao
 import com.example.real_estate_manager.data.db.ReminderRuleEntity
@@ -84,7 +82,17 @@ class ReminderWorker @AssistedInject constructor(
                 updatedAt = firedAt,
                 enabled = next != Long.MAX_VALUE
             )
-            reminderRepository.upsert(updated)
+            if (rule.scheduleMode == ReminderScheduleMode.ONE_TIME.name && next == Long.MAX_VALUE) {
+                reminderDao.upsert(
+                    updated.copy(
+                        syncStatus = "SYNCED",
+                        lastSyncError = null,
+                        lastSyncAttemptAt = null
+                    )
+                )
+            } else {
+                reminderRepository.upsert(updated)
+            }
             scheduler.scheduleRule(updated)
         }
         return Result.success()
@@ -106,38 +114,26 @@ class ReminderWorker @AssistedInject constructor(
         val propertyLine = propertyName?.let { "Объект: $it" } ?: "Объект: без привязки"
         val text = message ?: propertyLine
         val notificationId = UUID.randomUUID().toString()
-        val details = buildString {
-            append(propertyLine)
-            if (!message.isNullOrBlank()) {
-                append("\n")
-                append(message)
-            }
-        }
-        notificationDao.insert(
-            NotificationEntity(
-                id = notificationId,
-                userId = rule.userId,
-                propertyId = rule.propertyId,
-                ruleId = rule.id,
-                title = title,
-                message = details,
-                createdAt = System.currentTimeMillis(),
-                isActive = true,
-                deactivatedAt = null
-            )
+        val notificationEntity = ReminderNotificationFactory.createEntity(
+            id = notificationId,
+            rule = rule,
+            propertyName = propertyName,
+            createdAt = System.currentTimeMillis()
         )
+        notificationDao.insert(notificationEntity)
+        Log.i(TAG, "Notification created notification=$notificationId rule=${rule.id}")
         val intent = Intent(applicationContext, MainActivity::class.java).apply {
-            action = MainActivity.ACTION_OPEN_NOTIFICATIONS
-            putExtra(MainActivity.EXTRA_OPEN_NOTIFICATIONS, true)
+            action = MainActivity.ACTION_OPEN_NOTIFICATION_DETAILS
             putExtra(MainActivity.EXTRA_NOTIFICATION_ID, notificationId)
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra(MainActivity.EXTRA_REMINDER_ID, rule.id)
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
         }
-        val pendingIntent = TaskStackBuilder.create(applicationContext)
-            .addNextIntent(intent)
-            .getPendingIntent(
-                notificationId.hashCode(),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+        val pendingIntent = PendingIntent.getActivity(
+            applicationContext,
+            notificationId.hashCode(),
+            intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
 
         val notification = NotificationCompat.Builder(applicationContext, ReminderNotifications.CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_reminder)
@@ -147,7 +143,7 @@ class ReminderWorker @AssistedInject constructor(
             .setContentIntent(pendingIntent)
             .setStyle(
                 NotificationCompat.BigTextStyle()
-                    .bigText(details)
+                    .bigText(notificationEntity.message)
                     .setBigContentTitle(title)
                     .setSummaryText(propertyName ?: "Без привязки")
             )
@@ -156,7 +152,7 @@ class ReminderWorker @AssistedInject constructor(
             .build()
 
         manager.notify(rule.id.hashCode(), notification)
-        Log.i(TAG, "Notification posted rule=${rule.id}")
+        Log.i(TAG, "Notification posted notification=$notificationId rule=${rule.id}")
     }
 
     companion object {

@@ -5,19 +5,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.example.real_estate_manager.BuildConfig
 import com.example.real_estate_manager.ui.AuthViewModel
 import com.example.real_estate_manager.ui.RealEstateViewModel
+import com.example.real_estate_manager.ui.ServerSettingsViewModel
 import com.example.real_estate_manager.ui.screens.AddPropertyScreen
 import com.example.real_estate_manager.ui.screens.EditPropertyScreen
 import com.example.real_estate_manager.ui.screens.HomeScreen
+import com.example.real_estate_manager.ui.screens.NotificationDetailsScreen
 import com.example.real_estate_manager.ui.screens.LockScreen
 import com.example.real_estate_manager.ui.screens.NotificationsScreen
 import com.example.real_estate_manager.ui.screens.PropertiesListScreen
@@ -26,6 +33,7 @@ import com.example.real_estate_manager.ui.screens.PropertyInfoScreen
 import com.example.real_estate_manager.ui.screens.PropertyReadingsScreen
 import com.example.real_estate_manager.ui.screens.PropertyTransactionsScreen
 import com.example.real_estate_manager.ui.screens.RemindersScreen
+import com.example.real_estate_manager.ui.screens.ServerSettingsScreen
 import com.example.real_estate_manager.ui.screens.SignInScreen
 import com.example.real_estate_manager.ui.screens.SignUpScreen
 import com.example.real_estate_manager.ui.screens.StatsMonthScreen
@@ -40,7 +48,13 @@ sealed class Destination(val route: String) {
     data object Lock : Destination("auth/lock")
 
     data object Home : Destination("home")
+    data object ServerSettings : Destination("settings/server")
     data object Notifications : Destination("notifications")
+
+    data object NotificationDetails : Destination("notifications/{notificationId}") {
+        const val ARG_NOTIFICATION_ID = "notificationId"
+        fun route(notificationId: String): String = "notifications/${Uri.encode(notificationId)}"
+    }
     data object Properties : Destination("properties")
     data object AddProperty : Destination("properties/add")
 
@@ -69,12 +83,16 @@ sealed class Destination(val route: String) {
         fun route(propertyId: String): String = "properties/${Uri.encode(propertyId)}/readings"
     }
 
-    data object Reminders : Destination("reminders?propertyId={propertyId}") {
+    data object Reminders : Destination("reminders?propertyId={propertyId}&reminderId={reminderId}") {
         const val ARG_PROPERTY_ID = "propertyId"
+        const val ARG_REMINDER_ID = "reminderId"
 
-        fun route(propertyId: String? = null): String {
-            val id = propertyId?.takeIf { it.isNotBlank() }
-            return if (id == null) "reminders" else "reminders?propertyId=${Uri.encode(id)}"
+        fun route(propertyId: String? = null, reminderId: String? = null): String {
+            val params = buildList {
+                propertyId?.takeIf { it.isNotBlank() }?.let { add("propertyId=${Uri.encode(it)}") }
+                reminderId?.takeIf { it.isNotBlank() }?.let { add("reminderId=${Uri.encode(it)}") }
+            }
+            return if (params.isEmpty()) "reminders" else "reminders?${params.joinToString("&")}"
         }
     }
 
@@ -105,18 +123,49 @@ sealed class Destination(val route: String) {
 
 @Composable
 fun RealEstateNavigation(
-    openNotificationsRequest: Boolean = false,
-    onNotificationsRequestHandled: () -> Unit = {}
+    notificationNavigationTarget: NotificationNavigationTarget? = null,
+    onNotificationNavigationHandled: () -> Unit = {}
 ) {
     val navController: NavHostController = rememberNavController()
 
     val vm: RealEstateViewModel = hiltViewModel()
     val authVm: AuthViewModel = hiltViewModel()
+    val serverSettingsVm: ServerSettingsViewModel = hiltViewModel()
 
     val sessionState by authVm.sessionState.collectAsState()
+    val serverSettingsState by serverSettingsVm.uiState.collectAsState()
+    val backStackEntry by navController.currentBackStackEntryAsState()
+    val currentRoute = backStackEntry?.destination?.route
+    var pendingNotificationTarget by remember { mutableStateOf<NotificationNavigationTarget?>(null) }
+
+    fun notificationRoute(target: NotificationNavigationTarget): String =
+        target.notificationId
+            ?.takeIf { it.isNotBlank() }
+            ?.let { Destination.NotificationDetails.route(it) }
+            ?: Destination.Notifications.route
+
+    fun consumeNotificationTarget() {
+        pendingNotificationTarget = null
+        onNotificationNavigationHandled()
+    }
+
+    LaunchedEffect(Unit) {
+        serverSettingsVm.startupCheck()
+    }
+    LaunchedEffect(notificationNavigationTarget) {
+        if (notificationNavigationTarget != null) {
+            pendingNotificationTarget = notificationNavigationTarget
+        }
+    }
     // Если разлогинились — мгновенно уводим на SignIn и чистим backstack
-    LaunchedEffect(sessionState.userId) {
-        if (sessionState.userId == null) {
+    LaunchedEffect(sessionState.userId, currentRoute) {
+        val preAuthRoute = currentRoute in setOf(
+            Destination.Gate.route,
+            Destination.SignIn.route,
+            Destination.SignUp.route,
+            Destination.ServerSettings.route
+        )
+        if (sessionState.userId == null && !preAuthRoute) {
             val startId = navController.graph.findStartDestination().id
             navController.navigate(Destination.SignIn.route) {
                 popUpTo(startId) { inclusive = true }
@@ -125,12 +174,43 @@ fun RealEstateNavigation(
         }
     }
 
-    LaunchedEffect(openNotificationsRequest, sessionState.userId, sessionState.locked) {
-        if (openNotificationsRequest && sessionState.userId != null && !sessionState.locked) {
-            navController.navigate(Destination.Notifications.route) {
+    LaunchedEffect(serverSettingsState.connectionStatus, currentRoute) {
+        val serverUnavailable = serverSettingsState.connectionStatus != "Не проверено" &&
+            !serverSettingsState.connectionStatus.contains("найден", ignoreCase = true)
+        val startupRoute = currentRoute in setOf(
+            Destination.Gate.route,
+            Destination.SignIn.route,
+            Destination.SignUp.route
+        )
+        if (serverUnavailable && startupRoute) {
+            val startId = navController.graph.findStartDestination().id
+            navController.navigate(Destination.ServerSettings.route) {
+                popUpTo(startId) { inclusive = true }
                 launchSingleTop = true
             }
-            onNotificationsRequestHandled()
+        }
+    }
+
+    LaunchedEffect(serverSettingsState.connectionStatus, sessionState.userId) {
+        if (serverSettingsState.connectionStatus.startsWith("Автоматически найден сервер") &&
+            sessionState.userId != null
+        ) {
+            vm.refreshCloudData()
+        }
+    }
+
+    LaunchedEffect(pendingNotificationTarget, sessionState.userId, sessionState.locked, currentRoute) {
+        val target = pendingNotificationTarget ?: notificationNavigationTarget
+        if (target != null &&
+            sessionState.userId != null &&
+            !sessionState.locked &&
+            currentRoute != null &&
+            currentRoute != Destination.Gate.route
+        ) {
+            navController.navigate(notificationRoute(target)) {
+                launchSingleTop = true
+            }
+            consumeNotificationTarget()
         }
     }
 
@@ -140,7 +220,7 @@ fun RealEstateNavigation(
     ) {
 
         composable(Destination.Gate.route) {
-            LaunchedEffect(sessionState.userId, sessionState.locked) {
+            LaunchedEffect(sessionState.userId, sessionState.locked, pendingNotificationTarget, notificationNavigationTarget) {
                 val startId = navController.graph.findStartDestination().id
                 if (sessionState.userId == null) {
                     navController.navigate(Destination.SignIn.route) {
@@ -153,9 +233,18 @@ fun RealEstateNavigation(
                         launchSingleTop = true
                     }
                 } else {
-                    navController.navigate(Destination.Home.route) {
+                    val target = pendingNotificationTarget ?: notificationNavigationTarget
+                    val route = if (target != null) {
+                        notificationRoute(target)
+                    } else {
+                        Destination.Home.route
+                    }
+                    navController.navigate(route) {
                         popUpTo(startId) { inclusive = true }
                         launchSingleTop = true
+                    }
+                    if (target != null) {
+                        consumeNotificationTarget()
                     }
                 }
             }
@@ -167,10 +256,18 @@ fun RealEstateNavigation(
             LaunchedEffect(sessionState.userId, sessionState.locked) {
                 if (sessionState.userId != null) {
                     val startId = navController.graph.findStartDestination().id
-                    val route = if (sessionState.locked) Destination.Lock.route else Destination.Home.route
+                    val target = pendingNotificationTarget ?: notificationNavigationTarget
+                    val route = when {
+                        sessionState.locked -> Destination.Lock.route
+                        target != null -> notificationRoute(target)
+                        else -> Destination.Home.route
+                    }
                     navController.navigate(route) {
                         popUpTo(startId) { inclusive = true }
                         launchSingleTop = true
+                    }
+                    if (!sessionState.locked && target != null) {
+                        consumeNotificationTarget()
                     }
                 }
             }
@@ -180,14 +277,20 @@ fun RealEstateNavigation(
                         onDone(err)
                         if (err == null) {
                             val startId = navController.graph.findStartDestination().id
-                            navController.navigate(Destination.Home.route) {
+                            val target = pendingNotificationTarget ?: notificationNavigationTarget
+                            navController.navigate(target?.let(::notificationRoute) ?: Destination.Home.route) {
                                 popUpTo(startId) { inclusive = true }
                                 launchSingleTop = true
+                            }
+                            if (target != null) {
+                                consumeNotificationTarget()
                             }
                         }
                     }
                 },
-                onGoSignUp = { navController.navigate(Destination.SignUp.route) }
+                onGoSignUp = { navController.navigate(Destination.SignUp.route) },
+                onOpenServerSettings = { navController.navigate(Destination.ServerSettings.route) },
+                serverStatus = serverSettingsState.connectionStatus
             )
         }
 
@@ -216,9 +319,13 @@ fun RealEstateNavigation(
                 onUnlockByBiometricSuccess = {
                     authVm.unlockByBiometricSuccess()
                     val startId = navController.graph.findStartDestination().id
-                    navController.navigate(Destination.Home.route) {
+                    val target = pendingNotificationTarget ?: notificationNavigationTarget
+                    navController.navigate(target?.let(::notificationRoute) ?: Destination.Home.route) {
                         popUpTo(startId) { inclusive = true }
                         launchSingleTop = true
+                    }
+                    if (target != null) {
+                        consumeNotificationTarget()
                     }
                 },
                 onUnlockByPassword = { pass, onDone ->
@@ -226,9 +333,13 @@ fun RealEstateNavigation(
                         onDone(err)
                         if (err == null) {
                             val startId = navController.graph.findStartDestination().id
-                            navController.navigate(Destination.Home.route) {
+                            val target = pendingNotificationTarget ?: notificationNavigationTarget
+                            navController.navigate(target?.let(::notificationRoute) ?: Destination.Home.route) {
                                 popUpTo(startId) { inclusive = true }
                                 launchSingleTop = true
+                            }
+                            if (target != null) {
+                                consumeNotificationTarget()
                             }
                         }
                     }
@@ -251,6 +362,9 @@ fun RealEstateNavigation(
                 onOpenStats = { navController.navigate(Destination.Stats.route()) },
                 onOpenProperties = { navController.navigate(Destination.Properties.route) },
                 onOpenNotifications = { navController.navigate(Destination.Notifications.route) },
+                onOpenServerSettings = { navController.navigate(Destination.ServerSettings.route) },
+                showDeveloperTools = BuildConfig.DEBUG,
+                serverWarning = serverSettingsState.connectionStatus,
                 onLogoutNavigate = {
                     val startId = navController.graph.findStartDestination().id
                     navController.navigate(Destination.SignIn.route) {
@@ -261,9 +375,40 @@ fun RealEstateNavigation(
             )
         }
 
+        composable(Destination.ServerSettings.route) {
+            ServerSettingsScreen(
+                onBack = {
+                    if (!navController.popBackStack()) {
+                        navController.navigate(Destination.SignIn.route) {
+                            launchSingleTop = true
+                        }
+                    }
+                }
+            )
+        }
+
         composable(Destination.Notifications.route) {
             NotificationsScreen(
-                onBack = { navController.popBackStack() }
+                onBack = { navController.popBackStack() },
+                onOpenNotification = { id -> navController.navigate(Destination.NotificationDetails.route(id)) },
+                onOpenRelated = { type, id, propertyId -> navController.navigateRelated(type, id, propertyId) }
+            )
+        }
+
+        composable(
+            route = Destination.NotificationDetails.route,
+            arguments = listOf(
+                navArgument(Destination.NotificationDetails.ARG_NOTIFICATION_ID) { type = NavType.StringType }
+            )
+        ) { backStackEntry ->
+            val notificationId = backStackEntry.arguments
+                ?.getString(Destination.NotificationDetails.ARG_NOTIFICATION_ID)
+                ?: return@composable
+
+            NotificationDetailsScreen(
+                notificationId = notificationId,
+                onBack = { navController.popBackStack() },
+                onOpenRelated = { type, id, propertyId -> navController.navigateRelated(type, id, propertyId) }
             )
         }
 
@@ -391,11 +536,17 @@ fun RealEstateNavigation(
                     type = NavType.StringType
                     nullable = true
                     defaultValue = null
+                },
+                navArgument(Destination.Reminders.ARG_REMINDER_ID) {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
                 }
             )
         ) { backStackEntry ->
             RemindersScreen(
                 propertyId = backStackEntry.arguments?.getString(Destination.Reminders.ARG_PROPERTY_ID),
+                focusReminderId = backStackEntry.arguments?.getString(Destination.Reminders.ARG_REMINDER_ID),
                 onBack = { navController.popBackStack() }
             )
         }
@@ -446,5 +597,14 @@ fun RealEstateNavigation(
                 onBack = { navController.popBackStack() }
             )
         }
+    }
+}
+
+private fun NavHostController.navigateRelated(type: String?, id: String?, propertyId: String?) {
+    when (type) {
+        "REMINDER" -> navigate(Destination.Reminders.route(propertyId, id))
+        "PROPERTY" -> id?.takeIf { it.isNotBlank() }?.let { navigate(Destination.PropertyDetails.route(it)) }
+        "PAYMENT" -> propertyId?.takeIf { it.isNotBlank() }?.let { navigate(Destination.PropertyTransactions.route(it)) }
+        else -> navigate(Destination.Notifications.route)
     }
 }

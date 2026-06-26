@@ -3,18 +3,19 @@
 package com.example.real_estate_manager
 
 import androidx.compose.runtime.Composable
+import com.example.real_estate_manager.navigation.NotificationNavigationTarget
 import com.example.real_estate_manager.navigation.RealEstateNavigation
 import com.example.real_estate_manager.ui.theme.AppTheme
 
 @Composable
 fun RealEstateApp(
-    openNotificationsRequest: Boolean = false,
-    onNotificationsRequestHandled: () -> Unit = {}
+    notificationNavigationTarget: NotificationNavigationTarget? = null,
+    onNotificationNavigationHandled: () -> Unit = {}
 ) {
     AppTheme {
         RealEstateNavigation(
-            openNotificationsRequest = openNotificationsRequest,
-            onNotificationsRequestHandled = onNotificationsRequestHandled
+            notificationNavigationTarget = notificationNavigationTarget,
+            onNotificationNavigationHandled = onNotificationNavigationHandled
         )
     }
 }
