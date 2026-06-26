@@ -1,5 +1,6 @@
 package com.example.real_estate_manager.data.db
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
@@ -8,7 +9,8 @@ import androidx.room.PrimaryKey
     tableName = "reminders",
     indices = [
         Index(value = ["userId", "nextTriggerAt"]),
-        Index(value = ["userId", "propertyId"])
+        Index(value = ["userId", "propertyId"]),
+        Index(value = ["userId", "syncStatus"])
     ]
 )
 data class ReminderRuleEntity(
@@ -33,5 +35,9 @@ data class ReminderRuleEntity(
     val nextTriggerAt: Long,
     val lastFiredAt: Long?,
     val createdAt: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    @ColumnInfo(defaultValue = "'SYNCED'")
+    val syncStatus: String = "SYNCED",
+    val lastSyncError: String? = null,
+    val lastSyncAttemptAt: Long? = null
 )

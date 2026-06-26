@@ -11,6 +11,8 @@ import com.example.real_estate_manager.data.model.ReminderScheduleMode
 import com.example.real_estate_manager.data.model.ReminderType
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -31,6 +33,9 @@ class RemindersViewModel @Inject constructor(
 
     private val userIdFlow: StateFlow<String?> =
         session.userIdFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage
 
     val properties: StateFlow<List<Property>> =
         userIdFlow.flatMapLatest { uid ->
@@ -65,7 +70,7 @@ class RemindersViewModel @Inject constructor(
         enabled: Boolean = true
     ) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             reminders.createRule(
                 userId = uid,
                 propertyId = propertyId,
@@ -90,7 +95,7 @@ class RemindersViewModel @Inject constructor(
 
     fun createDefaultLeaseEndReminders(propertyId: String) {
         val uid = userIdFlow.value ?: return
-        viewModelScope.launch {
+        launchSafely {
             reminders.createDefaultLeaseEndReminders(uid, propertyId)
         }
     }
@@ -109,7 +114,7 @@ class RemindersViewModel @Inject constructor(
         minute: Int,
         enabled: Boolean
     ) {
-        viewModelScope.launch {
+        launchSafely {
             val updatedBase = rule.copy(
                 title = title,
                 message = message,
@@ -130,7 +135,7 @@ class RemindersViewModel @Inject constructor(
     }
 
     fun setEnabled(rule: ReminderRuleEntity, enabled: Boolean) {
-        viewModelScope.launch {
+        launchSafely {
             val updatedBase = rule.copy(enabled = enabled, updatedAt = System.currentTimeMillis())
             val next = if (enabled) reminders.recomputeNextTriggerAt(updatedBase, LocalDateTime.now()) else Long.MAX_VALUE
             reminders.upsert(updatedBase.copy(nextTriggerAt = next))
@@ -138,9 +143,23 @@ class RemindersViewModel @Inject constructor(
     }
 
     fun delete(rule: ReminderRuleEntity) {
-        viewModelScope.launch {
+        launchSafely {
             reminders.deleteById(rule.userId, rule.id)
         }
     }
 
+    fun consumeErrorMessage() {
+        _errorMessage.value = null
+    }
+
+    private fun launchSafely(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try {
+                block()
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                _errorMessage.value = error.toUiErrorMessage()
+            }
+        }
+    }
 }

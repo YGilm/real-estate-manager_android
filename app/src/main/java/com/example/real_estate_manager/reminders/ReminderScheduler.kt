@@ -13,11 +13,17 @@ import java.util.concurrent.TimeUnit
 import javax.inject.Inject
 import javax.inject.Singleton
 
+interface ReminderWorkScheduler {
+    fun schedule()
+    fun scheduleRule(rule: ReminderRuleEntity)
+    fun cancelRule(ruleId: String)
+}
+
 @Singleton
 class ReminderScheduler @Inject constructor(
     @ApplicationContext private val context: Context
-) {
-    fun schedule() {
+) : ReminderWorkScheduler {
+    override fun schedule() {
         val request = PeriodicWorkRequestBuilder<ReminderWorker>(6, TimeUnit.HOURS).build()
         WorkManager.getInstance(context).enqueueUniquePeriodicWork(
             WORK_NAME,
@@ -26,7 +32,7 @@ class ReminderScheduler @Inject constructor(
         )
     }
 
-    fun scheduleRule(rule: ReminderRuleEntity) {
+    override fun scheduleRule(rule: ReminderRuleEntity) {
         if (!rule.enabled || rule.nextTriggerAt == Long.MAX_VALUE) {
             WorkManager.getInstance(context).cancelUniqueWork(ruleWorkName(rule.id))
             return
@@ -48,7 +54,7 @@ class ReminderScheduler @Inject constructor(
         )
     }
 
-    fun cancelRule(ruleId: String) {
+    override fun cancelRule(ruleId: String) {
         WorkManager.getInstance(context).cancelUniqueWork(ruleWorkName(ruleId))
     }
 

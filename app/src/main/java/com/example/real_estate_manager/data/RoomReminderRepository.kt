@@ -5,7 +5,7 @@ import com.example.real_estate_manager.data.db.ReminderDao
 import com.example.real_estate_manager.data.db.ReminderRuleEntity
 import com.example.real_estate_manager.data.model.ReminderScheduleMode
 import com.example.real_estate_manager.data.model.ReminderType
-import com.example.real_estate_manager.reminders.ReminderScheduler
+import com.example.real_estate_manager.reminders.ReminderWorkScheduler
 import com.example.real_estate_manager.reminders.ReminderTimeCalculator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -21,7 +21,7 @@ import javax.inject.Singleton
 class RoomReminderRepository @Inject constructor(
     private val reminderDao: ReminderDao,
     private val propertyDao: PropertyDao,
-    private val scheduler: ReminderScheduler
+    private val scheduler: ReminderWorkScheduler
 ) : ReminderRepository {
 
     override fun observeAll(userId: String): Flow<List<ReminderRuleEntity>> =

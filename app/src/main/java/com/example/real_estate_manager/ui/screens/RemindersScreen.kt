@@ -86,6 +86,7 @@ import java.time.format.DateTimeFormatter
 @Composable
 fun RemindersScreen(
     propertyId: String?,
+    focusReminderId: String? = null,
     onBack: () -> Unit,
     vm: RemindersViewModel = hiltViewModel()
 ) {
@@ -94,6 +95,7 @@ fun RemindersScreen(
     val property = properties.firstOrNull { it.id == propertyId }
     var showCreate by remember { mutableStateOf(false) }
     var editingRule by remember { mutableStateOf<ReminderRuleEntity?>(null) }
+    var handledFocusReminderId by remember(focusReminderId) { mutableStateOf<String?>(null) }
     val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
 
     fun requestNotificationsPermission() {
@@ -103,6 +105,14 @@ fun RemindersScreen(
     }
 
     LaunchedEffect(Unit) { requestNotificationsPermission() }
+    LaunchedEffect(focusReminderId, rules) {
+        val id = focusReminderId?.takeIf { it.isNotBlank() } ?: return@LaunchedEffect
+        if (handledFocusReminderId == id) return@LaunchedEffect
+        rules.firstOrNull { it.id == id }?.let { rule ->
+            editingRule = rule
+            handledFocusReminderId = id
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -144,7 +154,7 @@ fun RemindersScreen(
                         .weight(1f)
                         .fillMaxWidth(),
                     icon = Icons.Filled.Notifications,
-                    title = "На данный момент напоминаний нет",
+                    title = "Нет напоминаний.",
                     message = "Добавьте первое напоминание для этого объекта.",
                     primaryActionTitle = "Добавить напоминание",
                     onPrimaryAction = {
@@ -270,6 +280,17 @@ private fun ReminderRuleCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                reminderSyncStatusText(rule)?.let { text ->
+                    Text(
+                        text = text,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (rule.lastSyncError != null) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.primary
+                        }
+                    )
+                }
             }
             Switch(checked = rule.enabled, onCheckedChange = onEnabledChange)
             IconButton(onClick = onDelete) {
@@ -278,6 +299,18 @@ private fun ReminderRuleCard(
         }
     }
 }
+
+private fun reminderSyncStatusText(rule: ReminderRuleEntity): String? =
+    if (rule.lastSyncError != null) {
+        "Ошибка синхронизации"
+    } else {
+        when (rule.syncStatus) {
+            "PENDING_CREATE",
+            "PENDING_UPDATE",
+            "PENDING_DELETE" -> "Ожидает синхронизации"
+            else -> null
+        }
+    }
 
 @Composable
 private fun CreateReminderDialog(

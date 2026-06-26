@@ -1,3 +1,4 @@
+
 package com.example.real_estate_manager.data.model
 
 enum class ReminderType {
