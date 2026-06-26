@@ -2,6 +2,7 @@ package com.example.real_estate_manager.ui.bills
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
@@ -53,7 +54,9 @@ fun BillsListScreen(
         }
     ) { inner ->
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(inner),
             contentAlignment = Alignment.Center
         ) {
             // Пока просто заглушка — потом сюда придёт список счетов

@@ -69,6 +69,7 @@ import androidx.core.content.FileProvider
 import com.example.real_estate_manager.data.model.Property
 import com.example.real_estate_manager.data.model.Transaction
 import com.example.real_estate_manager.data.model.TxType
+import com.example.real_estate_manager.network.dto.StatisticsDto
 import com.example.real_estate_manager.ui.RealEstateViewModel
 import com.example.real_estate_manager.ui.util.DateFmtDMY
 import com.example.real_estate_manager.ui.util.ReportPdfGenerator
@@ -99,7 +100,9 @@ fun StatsScreen(
 ) {
     val txs by vm.transactions.collectAsState()
     val properties by vm.properties.collectAsState()
+    val backendStats by vm.backendStatistics.collectAsState()
 
+    val isPropertyScoped = !preselectedPropertyId.isNullOrBlank()
     var selectedPropertyId by rememberSaveable { mutableStateOf<String?>(preselectedPropertyId) }
 
     // 0 = Месяц, 1 = Год, 2 = Период
@@ -109,6 +112,10 @@ fun StatsScreen(
         if (!preselectedPropertyId.isNullOrBlank()) {
             selectedPropertyId = preselectedPropertyId
         }
+    }
+
+    LaunchedEffect(selectedPropertyId, tab) {
+        vm.loadStatistics(selectedPropertyId, LocalDate.now().year)
     }
 
     val filteredTxs = remember(txs, selectedPropertyId) {
@@ -164,6 +171,7 @@ fun StatsScreen(
                 ObjectFilterRowFullWidth(
                     properties = properties,
                     selectedPropertyId = selectedPropertyId,
+                    locked = isPropertyScoped,
                     onSelected = { selectedPropertyId = it }
                 )
 
@@ -182,6 +190,7 @@ fun StatsScreen(
                         0 -> MonthTabContent(txs = filteredTxs)
                         1 -> YearTabContent(
                             txs = filteredTxs,
+                            backendStats = backendStats,
                             onOpenMonth = { y, m -> onOpenMonth(y, m, selectedPropertyId) }
                         )
                         2 -> PeriodTabContent(
@@ -259,6 +268,7 @@ private fun StatsTabs(
 private fun ObjectFilterRowFullWidth(
     properties: List<Property>,
     selectedPropertyId: String?,
+    locked: Boolean = false,
     onSelected: (String?) -> Unit
 ) {
     var expanded by remember { mutableStateOf(false) }
@@ -270,7 +280,7 @@ private fun ObjectFilterRowFullWidth(
 
     ExposedDropdownMenuBox(
         expanded = expanded,
-        onExpandedChange = { expanded = !expanded },
+        onExpandedChange = { if (!locked) expanded = !expanded },
         modifier = Modifier.fillMaxWidth()
     ) {
         OutlinedTextField(
@@ -281,9 +291,13 @@ private fun ObjectFilterRowFullWidth(
             maxLines = 1,
             label = { Text("Фильтр по объекту") },
             modifier = Modifier
-                .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = true)
+                .menuAnchor(type = MenuAnchorType.PrimaryNotEditable, enabled = !locked)
                 .fillMaxWidth(),
-            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) }
+            trailingIcon = {
+                if (!locked) {
+                    ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded)
+                }
+            }
         )
 
         ExposedDropdownMenu(
@@ -471,7 +485,7 @@ private fun PeriodTabContent(
                         )
                     } else {
                         Text(
-                            text = "Транзакций: ${periodTxs.size} • Месяцев: $months",
+                            text = "Платежей: ${periodTxs.size} • Месяцев: $months",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -567,7 +581,7 @@ private fun PeriodTabContent(
             val showAvg = fromSelected && months >= 2
             TotalsBlock(
                 t = totals,
-                avgNetLabel = if (showAvg) "Средняя за месяц:" else null,
+                avgNetLabel = if (showAvg) "Средняя прибыль:" else null,
                 avgNetValue = if (showAvg) avgNet else null
             )
         }
@@ -653,10 +667,10 @@ private fun MonthTabContent(txs: List<Transaction>) {
                 avgNetValue = null
             )
         }
-        item { Text("Транзакции", style = MaterialTheme.typography.titleMedium) }
+        item { Text("Платежи", style = MaterialTheme.typography.titleMedium) }
 
         if (monthTxs.isEmpty()) {
-            item { Text("Нет транзакций за выбранный месяц", color = MaterialTheme.colorScheme.onSurfaceVariant) }
+            item { Text("Нет платежей.", color = MaterialTheme.colorScheme.onSurfaceVariant) }
         } else {
             itemsIndexed(monthTxs) { _, t ->
                 val isFuture = t.date.isAfter(LocalDate.now())
@@ -698,6 +712,7 @@ private fun MonthTabContent(txs: List<Transaction>) {
 @Composable
 private fun YearTabContent(
     txs: List<Transaction>,
+    backendStats: StatisticsDto?,
     onOpenMonth: (year: Int, month: Int) -> Unit
 ) {
     val years = remember(txs) {
@@ -710,15 +725,24 @@ private fun YearTabContent(
 
     data class MonthRow(val month: Int, val totals: Totals)
 
-    val byMonth = remember(txs, selectedYear) {
+    val byMonth = remember(txs, selectedYear, backendStats) {
+        val remoteMonths = backendStats?.months
+            ?.filter { it.year == selectedYear }
+            ?.associateBy { it.month }
+            .orEmpty()
         (1..12).map { m ->
-            val monthTx = txs.filter { it.date.year == selectedYear && it.date.monthValue == m }
-            MonthRow(month = m, totals = monthTx.computeTotals())
+            val remote = remoteMonths[m]
+            if (remote != null) {
+                MonthRow(month = m, totals = Totals(remote.income, remote.expense))
+            } else {
+                val monthTx = txs.filter { it.date.year == selectedYear && it.date.monthValue == m }
+                MonthRow(month = m, totals = monthTx.computeTotals())
+            }
         }
     }
 
-    val yearTotals = remember(byMonth) {
-        Totals(
+    val yearTotals = remember(byMonth, backendStats) {
+        backendStats?.totals?.let { Totals(it.income, it.expense) } ?: Totals(
             income = byMonth.sumOf { it.totals.income },
             expense = byMonth.sumOf { it.totals.expense }
         )

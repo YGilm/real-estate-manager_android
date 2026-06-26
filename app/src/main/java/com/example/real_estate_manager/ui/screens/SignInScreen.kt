@@ -25,6 +25,7 @@ import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -64,7 +65,9 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun SignInScreen(
     onSignIn: (email: String, password: String, remember: Boolean, onDone: (String?) -> Unit) -> Unit,
-    onGoSignUp: () -> Unit
+    onGoSignUp: () -> Unit,
+    onOpenServerSettings: () -> Unit,
+    serverStatus: String? = null
 ) {
     var email by remember { mutableStateOf("") }
     var pass by remember { mutableStateOf("") }
@@ -317,6 +320,30 @@ fun SignInScreen(
                             modifier = Modifier.align(Alignment.CenterHorizontally)
                         ) {
                             Text("Создать аккаунт")
+                        }
+
+                        TextButton(
+                            onClick = onOpenServerSettings,
+                            enabled = !loading,
+                            modifier = Modifier.align(Alignment.CenterHorizontally)
+                        ) {
+                            Icon(Icons.Filled.Settings, contentDescription = null)
+                            Spacer(Modifier.width(6.dp))
+                            Text("Настройки сервера")
+                        }
+
+                        if (!serverStatus.isNullOrBlank() && serverStatus != "Не проверено") {
+                            Text(
+                                text = serverStatus,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (serverStatus.contains("найден", ignoreCase = true)) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.error
+                                },
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
                         }
                     }
                 }

@@ -53,6 +53,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     // Для Kotlin 2.x composeOptions не требуются — используем compose-плагин
 
@@ -108,6 +109,13 @@ dependencies {
 
     // DataStore (сессия пользователя)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    // Network sync
+    implementation("com.squareup.retrofit2:retrofit:2.12.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.12.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("com.google.code.gson:gson:2.13.2")
 
     // Загрузка изображений
     implementation("io.coil-kt:coil-compose:2.7.0")

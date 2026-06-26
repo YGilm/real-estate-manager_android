@@ -31,6 +31,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Checkbox
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -70,6 +71,7 @@ fun SignUpScreen(
     var rememberMe by remember { mutableStateOf(true) }
     var showPassword by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var loading by remember { mutableStateOf(false) }
 
     val infinite = rememberInfiniteTransition(label = "signup_anim")
     val iconScale by infinite.animateFloat(
@@ -189,6 +191,7 @@ fun SignUpScreen(
                             onValueChange = { email = it; error = null },
                             label = { Text("Email") },
                             singleLine = true,
+                            enabled = !loading,
                             modifier = Modifier.fillMaxWidth().testTag("SignUpEmail"),
                             keyboardOptions = KeyboardOptions(
                                 keyboardType = KeyboardType.Email,
@@ -201,6 +204,7 @@ fun SignUpScreen(
                             onValueChange = { pass = it; error = null },
                             label = { Text("Пароль") },
                             singleLine = true,
+                            enabled = !loading,
                             modifier = Modifier.fillMaxWidth().testTag("SignUpPassword"),
                             visualTransformation = if (showPassword) {
                                 VisualTransformation.None
@@ -208,7 +212,10 @@ fun SignUpScreen(
                                 PasswordVisualTransformation()
                             },
                             trailingIcon = {
-                                IconButton(onClick = { showPassword = !showPassword }) {
+                                IconButton(
+                                    onClick = { showPassword = !showPassword },
+                                    enabled = !loading
+                                ) {
                                     Icon(
                                         imageVector = if (showPassword) {
                                             Icons.Filled.VisibilityOff
@@ -234,6 +241,7 @@ fun SignUpScreen(
                             onValueChange = { confirmPass = it; error = null },
                             label = { Text("Повторите пароль") },
                             singleLine = true,
+                            enabled = !loading,
                             modifier = Modifier.fillMaxWidth().testTag("SignUpPasswordConfirm"),
                             visualTransformation = if (showPassword) {
                                 VisualTransformation.None
@@ -256,15 +264,29 @@ fun SignUpScreen(
                                     error = "Пароли не совпадают"
                                     return@Button
                                 }
-                                onSignUp(email, pass, rememberMe) { msg -> error = msg }
+                                loading = true
+                                onSignUp(email, pass, rememberMe) { msg ->
+                                    loading = false
+                                    error = msg
+                                }
                             },
+                            enabled = !loading,
                             modifier = Modifier.fillMaxWidth()
                         ) {
-                            Text("Создать")
+                            if (loading) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(18.dp),
+                                    strokeWidth = 2.dp,
+                                    color = MaterialTheme.colorScheme.onPrimary
+                                )
+                            } else {
+                                Text("Создать")
+                            }
                         }
 
                         TextButton(
                             onClick = onBack,
+                            enabled = !loading,
                             modifier = Modifier.align(Alignment.CenterHorizontally)
                         ) {
                             Text("Назад")

@@ -25,7 +25,7 @@ data class Totals(
 
 /**
  * Вернуть только те транзакции, дата которых уже наступила (date <= сегодня).
- * Будущие транзакции считаются "запланированными" и в статистику не попадают.
+ * Будущие платежи считаются "запланированными" и в статистику не попадают.
  */
 fun List<Transaction>.pastOnly(): List<Transaction> {
     val today = LocalDate.now()
@@ -115,7 +115,7 @@ fun buildPeriodReportText(
     val (start, end) = if (from.isAfter(to)) to to from else from to to
 
     val rangeLine = "${start.format(DateFmtDMY)} — ${end.format(DateFmtDMY)}"
-    val futureNote = if (includeFuture) "" else "\n(Будущие транзакции не учитываются)"
+    val futureNote = if (includeFuture) "" else "\n(Будущие платежи не учитываются)"
 
     return buildString {
         appendLine("Отчёт по объекту: $propertyName")
@@ -124,8 +124,8 @@ fun buildPeriodReportText(
         appendLine()
         appendLine("Доход: ${moneyFormatPlain(totals.income)}")
         appendLine("Расход: ${moneyFormatPlain(totals.expense)}")
-        appendLine("Итого (реальная чистая выручка): ${moneyFormatPlain(totals.total)}")
-        appendLine("Средняя чистая выручка в месяц: ${moneyFormatPlain(avgNetPerMonth)}")
+        appendLine("Итого: ${moneyFormatPlain(totals.total)}")
+        appendLine("Средняя прибыль: ${moneyFormatPlain(avgNetPerMonth)}")
     }.trim()
 }
 

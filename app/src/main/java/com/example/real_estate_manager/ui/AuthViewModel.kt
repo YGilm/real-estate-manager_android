@@ -6,6 +6,7 @@ import com.example.real_estate_manager.auth.AuthRepository
 import com.example.real_estate_manager.auth.SessionState
 import com.example.real_estate_manager.auth.UserSession
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -16,6 +17,12 @@ class AuthViewModel @Inject constructor(
     private val repo: AuthRepository,
     private val session: UserSession
 ) : ViewModel() {
+
+    init {
+        launchSafely {
+            repo.restoreSessionFromToken()
+        }
+    }
 
     // --- то, что ожидает RealEstateNavigation.kt ---
     val sessionState: StateFlow<SessionState> =
@@ -29,11 +36,11 @@ class AuthViewModel @Inject constructor(
         session.ttlMinutesFlow.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), 15)
 
     fun setTtl(minutes: Int) {
-        viewModelScope.launch { session.setTtlMinutes(minutes) }
+        launchSafely { session.setTtlMinutes(minutes) }
     }
 
     fun unlockByBiometricSuccess() {
-        viewModelScope.launch { session.unlockAndExtend() }
+        launchSafely { session.unlockAndExtend() }
     }
 
     fun unlockByPassword(password: String, onDone: (String?) -> Unit) {
@@ -42,9 +49,9 @@ class AuthViewModel @Inject constructor(
             onDone("Сессия недоступна, войдите заново")
             return
         }
-        viewModelScope.launch {
-            val res = repo.reauth(uid, password)
-            onDone(res.exceptionOrNull()?.message)
+        launchSafely(onError = onDone) {
+            val result = repo.reauth(uid, password)
+            onDone(result.exceptionOrNull()?.message)
         }
     }
 
@@ -62,21 +69,21 @@ class AuthViewModel @Inject constructor(
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
 
     fun register(email: String, pass: String, remember: Boolean, onDone: (String?) -> Unit) {
-        viewModelScope.launch {
-            val res = repo.register(email.trim(), pass, remember)
-            onDone(res.exceptionOrNull()?.message)
+        launchSafely(onError = onDone) {
+            val result = repo.register(email.trim(), pass, remember)
+            onDone(result.exceptionOrNull()?.message)
         }
     }
 
     fun login(email: String, pass: String, remember: Boolean, onDone: (String?) -> Unit) {
-        viewModelScope.launch {
-            val res = repo.login(email.trim(), pass, remember)
-            onDone(res.exceptionOrNull()?.message)
+        launchSafely(onError = onDone) {
+            val result = repo.login(email.trim(), pass, remember)
+            onDone(result.exceptionOrNull()?.message)
         }
     }
 
     fun logout() {
-        viewModelScope.launch { repo.logout() }
+        launchSafely { repo.logout() }
     }
 
     fun updateEmail(newEmail: String, onDone: (String?) -> Unit) {
@@ -85,9 +92,9 @@ class AuthViewModel @Inject constructor(
             onDone("Сессия не активна")
             return
         }
-        viewModelScope.launch {
-            val res = repo.updateEmail(uid, newEmail)
-            onDone(res.exceptionOrNull()?.message)
+        launchSafely(onError = onDone) {
+            val result = repo.updateEmail(uid, newEmail)
+            onDone(result.exceptionOrNull()?.message)
         }
     }
 
@@ -97,9 +104,23 @@ class AuthViewModel @Inject constructor(
             onDone("Сессия не активна")
             return
         }
+        launchSafely(onError = onDone) {
+            val result = repo.changePassword(uid, oldPassword, newPassword)
+            onDone(result.exceptionOrNull()?.message)
+        }
+    }
+
+    private fun launchSafely(
+        onError: ((String?) -> Unit)? = null,
+        block: suspend () -> Unit
+    ) {
         viewModelScope.launch {
-            val res = repo.changePassword(uid, oldPassword, newPassword)
-            onDone(res.exceptionOrNull()?.message)
+            try {
+                block()
+            } catch (error: Throwable) {
+                if (error is CancellationException) throw error
+                onError?.invoke(error.toUiErrorMessage())
+            }
         }
     }
 }

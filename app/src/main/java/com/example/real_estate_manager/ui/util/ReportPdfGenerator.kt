@@ -330,8 +330,8 @@ object ReportPdfGenerator {
 
             val row2Y = row1Y + cardH + gap
             val netAccent = if (totals.total >= 0) INCOME else EXPENSE
-            card(left, row2Y, "Реальная чистая выручка", netText, netAccent)
-            card(left + cardW + gap, row2Y, "Средняя чистая выручка / мес", avgText, PRIMARY)
+            card(left, row2Y, "Итого", netText, netAccent)
+            card(left + cardW + gap, row2Y, "Средняя прибыль", avgText, PRIMARY)
 
             ctx.y = row2Y + cardH + 18f
             return ctx
@@ -367,7 +367,7 @@ object ReportPdfGenerator {
             val h2Right = Paint(h2).apply { textAlign = Paint.Align.RIGHT }
             ctx.canvas.drawText("Доход", left + colMonthW + colIncW - 10f, hb, h2Right)
             ctx.canvas.drawText("Расход", left + colMonthW + colIncW + colExpW - 10f, hb, h2Right)
-            ctx.canvas.drawText("Итог", right - 10f, hb, h2Right)
+            ctx.canvas.drawText("Итого", right - 10f, hb, h2Right)
 
             ctx.y = tableTop + headerH
 
@@ -482,7 +482,7 @@ object ReportPdfGenerator {
             val amountW = amountPaint.measureText(netAmount)
             val labelX = amountX - amountW - 8f
 
-            ctx.canvas.drawText("Итог:", labelX, top + 20f, labelPaint)
+            ctx.canvas.drawText("Итого:", labelX, top + 20f, labelPaint)
             ctx.canvas.drawText(netAmount, amountX, top + 20f, amountPaint)
 
             ctx.y = top + h + 10f
@@ -543,12 +543,12 @@ object ReportPdfGenerator {
         ctx = drawMonthSummaryTable(ctx)
 
         ctx = ensureSpace(ctx, 40f)
-        ctx.canvas.drawText("Детализация транзакций", left, ctx.y + h1.textSize, h1)
+        ctx.canvas.drawText("Детализация платежей", left, ctx.y + h1.textSize, h1)
         ctx.y += 22f
 
         if (txSorted.isEmpty()) {
             ctx = ensureSpace(ctx, 40f)
-            ctx.canvas.drawText("Нет транзакций в выбранном периоде.", left, ctx.y + body.textSize, bodyMuted)
+            ctx.canvas.drawText("Нет платежей в выбранном периоде.", left, ctx.y + body.textSize, bodyMuted)
             ctx.y += 24f
         } else {
             groups.forEach { ym ->

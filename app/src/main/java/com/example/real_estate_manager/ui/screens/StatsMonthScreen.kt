@@ -93,7 +93,7 @@ fun StatsMonthScreen(
             TotalsRow(totals)
             Spacer(Modifier.height(16.dp))
 
-            Text("Транзакции", style = MaterialTheme.typography.titleMedium)
+            Text("Платежи", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
 
             LazyColumn(
